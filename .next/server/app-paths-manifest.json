@@ -1,0 +1,9 @@
+{
+  "/api/notifications/route": "app/api/notifications/route.js",
+  "/api/cost-sheet/route": "app/api/cost-sheet/route.js",
+  "/api/billing-cycles/route": "app/api/billing-cycles/route.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/auth/login/page": "app/auth/login/page.js",
+  "/auth/register/page": "app/auth/register/page.js",
+  "/mess-setup/page": "app/mess-setup/page.js"
+}

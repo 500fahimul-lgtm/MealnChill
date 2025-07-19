@@ -1,0 +1,391 @@
+'use client'
+
+import { Group } from '@mui/icons-material'
+import { useEffect, useState } from 'react'
+
+interface MemberData {
+  id: string
+  name: string
+  phone: string
+  email: string
+  totalMealsTaken: number
+  totalMoneyPaid: number
+  role: string
+  joinedAt: string
+}
+
+interface SeeMembersProps {
+  messId: string
+  isAdmin: boolean
+}
+
+export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
+  const [members, setMembers] = useState<MemberData[]>([])
+  const [filteredMembers, setFilteredMembers] = useState<MemberData[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showAddMember, setShowAddMember] = useState(false)
+  const [newMemberEmail, setNewMemberEmail] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [message, setMessage] = useState('')
+
+  const fetchMembers = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/members', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMembers(data.members)
+        setFilteredMembers(data.members)
+      }
+    } catch (error) {
+      // Handle error silently
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchMembers()
+  }, [])
+
+  useEffect(() => {
+    const filtered = members.filter(member =>
+      member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      member.phone.includes(searchQuery)
+    )
+    setFilteredMembers(filtered)
+  }, [searchQuery, members])
+
+  const handleRemoveMember = async (memberId: string, memberName: string) => {
+    if (!confirm(`Are you sure you want to remove ${memberName} from the mess?`)) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/members/${memberId}/remove`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        setMessage(`${memberName} has been removed from the mess`)
+        await fetchMembers()
+      } else {
+        const error = await response.json()
+        setMessage(error.message || 'Failed to remove member')
+      }
+    } catch (error) {
+      setMessage('Network error. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newMemberEmail.trim()) return
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/members/add', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: newMemberEmail.trim()
+        })
+      })
+
+      if (response.ok) {
+        setMessage('Member added successfully')
+        setNewMemberEmail('')
+        setShowAddMember(false)
+        await fetchMembers()
+      } else {
+        const error = await response.json()
+        setMessage(error.message || 'Failed to add member')
+      }
+    } catch (error) {
+      setMessage('Network error. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleAdminAction = async (memberId: string, memberName: string, action: 'promote' | 'demote' | 'transfer') => {
+    let confirmMessage = ''
+    if (action === 'promote') {
+      confirmMessage = `Are you sure you want to promote ${memberName} to admin?`
+    } else if (action === 'demote') {
+      confirmMessage = `Are you sure you want to remove admin rights from ${memberName}?`
+    } else if (action === 'transfer') {
+      confirmMessage = `Are you sure you want to transfer admin rights to ${memberName}? You will lose admin privileges.`
+    }
+
+    if (!confirm(confirmMessage)) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/admin/transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          targetUserId: memberId,
+          action: action
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage(data.message)
+        await fetchMembers()
+        
+        // If transferring admin rights, reload the page to update permissions
+        if (action === 'transfer') {
+          window.location.reload()
+        }
+      } else {
+        const error = await response.json()
+        setMessage(error.message || `Failed to ${action} member`)
+      }
+    } catch (error) {
+      setMessage('Network error. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="animate-pulse">
+          <div className="h-6 bg-gray-300 rounded mb-4"></div>
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-xl font-semibold text-gray-900">Mess Members</h3>
+        {isAdmin && (
+          <button
+            onClick={() => setShowAddMember(true)}
+            className="bg-primary-600 text-white px-4 py-2 rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Add Member
+          </button>
+        )}
+      </div>
+
+      {/* Message */}
+      {message && (
+        <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-blue-800">{message}</p>
+          <button
+            onClick={() => setMessage('')}
+            className="text-blue-600 hover:text-blue-800 text-sm mt-1"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {/* Search Bar */}
+      <div className="mb-6">
+        <input
+          type="text"
+          placeholder="Search members by name, email, or phone..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+        />
+      </div>
+
+      {/* Members List */}
+      {filteredMembers.length === 0 ? (
+        <div className="text-center py-8">
+          <div className="text-gray-400 text-4xl mb-4">
+            <Group style={{ fontSize: '4rem' }} />
+          </div>
+          <h4 className="text-lg font-medium text-gray-600 mb-2">
+            {searchQuery ? 'No members found' : 'No members yet'}
+          </h4>
+          <p className="text-gray-500">
+            {searchQuery ? 'Try adjusting your search terms' : 'Add members to get started'}
+          </p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Member
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contact
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Meals
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total Paid
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Role
+                </th>
+                {isAdmin && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredMembers.map((member) => (
+                <tr key={member.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-gray-900">{member.name}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm text-gray-900">{member.phone}</div>
+                    <div className="text-sm text-gray-500">{member.email}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-semibold text-blue-600">{member.totalMealsTaken}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-semibold text-green-600">৳{member.totalMoneyPaid}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      member.role === 'admin' 
+                        ? 'bg-amber-100 text-amber-800' 
+                        : 'bg-blue-100 text-blue-800'
+                    }`}>
+                      {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                    </span>
+                  </td>
+                  {isAdmin && (
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex space-x-2">
+                        {member.role !== 'admin' ? (
+                          <>
+                            <button
+                              onClick={() => handleAdminAction(member.id, member.name, 'promote')}
+                              disabled={isProcessing}
+                              className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 text-sm"
+                            >
+                              Promote
+                            </button>
+                            <button
+                              onClick={() => handleAdminAction(member.id, member.name, 'transfer')}
+                              disabled={isProcessing}
+                              className="text-green-600 hover:text-green-900 disabled:text-gray-400 text-sm"
+                            >
+                              Transfer Admin
+                            </button>
+                            <button
+                              onClick={() => handleRemoveMember(member.id, member.name)}
+                              disabled={isProcessing}
+                              className="text-red-600 hover:text-red-900 disabled:text-gray-400 text-sm"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleAdminAction(member.id, member.name, 'demote')}
+                            disabled={isProcessing}
+                            className="text-orange-600 hover:text-orange-900 disabled:text-gray-400 text-sm"
+                          >
+                            Demote
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Add Member Modal */}
+      {showAddMember && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
+            <h4 className="text-lg font-semibold mb-4">Add New Member</h4>
+            
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Member Email Address
+                </label>
+                <input
+                  type="email"
+                  value={newMemberEmail}
+                  onChange={(e) => setNewMemberEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  placeholder="Enter member's email"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  The user must already be registered in the system
+                </p>
+              </div>
+
+              <div className="flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowAddMember(false)
+                    setNewMemberEmail('')
+                  }}
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isProcessing || !newMemberEmail.trim()}
+                  className="px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 disabled:bg-gray-400"
+                >
+                  {isProcessing ? 'Adding...' : 'Add Member'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
