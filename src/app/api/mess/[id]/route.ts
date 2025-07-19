@@ -4,7 +4,7 @@ import User from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
 
@@ -21,7 +21,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
     const userId = decoded.userId
 
-    const messId = params.id
+    const resolvedParams = await params
+    const messId = resolvedParams.id
 
     // Get user to verify they belong to this mess
     const user = await User.findById(userId)
@@ -77,7 +78,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   console.log('=== PUT API CALLED ===')
   try {
     await connectDB()
@@ -96,7 +97,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
     const userId = decoded.userId
 
-    const messId = params.id
+    const resolvedParams = await params
+    const messId = resolvedParams.id
 
     // Get user to verify they belong to this mess
     const user = await User.findById(userId)

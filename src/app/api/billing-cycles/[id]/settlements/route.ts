@@ -14,7 +14,7 @@ const verifyToken = async (token: string) => {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB()
@@ -29,7 +29,8 @@ export async function GET(
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
     }
 
-    const cycleId = params.id
+    const resolvedParams = await params
+    const cycleId = resolvedParams.id
 
     const settlements = await MemberSettlement.find({
       billingCycleId: cycleId,

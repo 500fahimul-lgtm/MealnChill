@@ -6,8 +6,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export async function PUT(
   req: NextRequest, 
-  { params }: { params: { id: string; userId: string } }
+  { params }: { params: Promise<{ id: string; userId: string }> }
 ) {
+  const resolvedParams = await params
   try {
     await connectDB()
 
@@ -24,7 +25,7 @@ export async function PUT(
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
     const currentUserId = decoded.userId
 
-    const { id: messId, userId: targetUserId } = params
+    const { id: messId, userId: targetUserId } = resolvedParams
 
     // Get current user to verify they belong to this mess and are admin
     const currentUser = await User.findById(currentUserId)

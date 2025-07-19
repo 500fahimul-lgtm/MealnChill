@@ -17,16 +17,18 @@ const verifyToken = async (token: string) => {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  return handleDepositAction(request, { params })
+  const resolvedParams = await params
+  return handleDepositAction(request, { params: resolvedParams })
 }
 
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
-  return handleDepositAction(request, { params })
+  const resolvedParams = await params
+  return handleDepositAction(request, { params: resolvedParams })
 }
 
 async function handleDepositAction(

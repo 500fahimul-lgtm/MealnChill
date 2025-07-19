@@ -1,11 +1,11 @@
 'use client'
 
 import {
-  CheckCircle as CheckCircleIcon,
-  Home as HomeIcon,
-  Notifications as NotificationsIcon,
-  Person as PersonIcon,
-  Restaurant as RestaurantIcon,
+    CheckCircle as CheckCircleIcon,
+    Home as HomeIcon,
+    Notifications as NotificationsIcon,
+    Person as PersonIcon,
+    Restaurant as RestaurantIcon,
 } from '@mui/icons-material'
 import { useEffect, useState } from 'react'
 
@@ -32,7 +32,7 @@ export default function AnimatedIcon({ type, isActive, className = '' }: Animate
     if (!isActive) {
       setJustActivated(false)
     }
-  }, [isActive])
+  }, [isActive, justActivated])
 
   const getIconColors = () => {
     switch (type) {

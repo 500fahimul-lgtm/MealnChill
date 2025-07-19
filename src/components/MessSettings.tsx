@@ -7,7 +7,7 @@ import {
     Search,
     Warning
 } from '@mui/icons-material';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 // Helper function to convert 24-hour time to 12-hour format
 const formatTimeTo12Hour = (time24: string): string => {
@@ -82,7 +82,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
     }, 4000) // Auto-hide after 4 seconds
   }
 
-  const fetchMessData = async () => {
+  const fetchMessData = useCallback(async () => {
     try {
       setIsLoading(true)
       const token = localStorage.getItem('token')
@@ -126,7 +126,11 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [messId])
+
+  useEffect(() => {
+    fetchMessData()
+  }, [fetchMessData])
 
   const handleUpdateMess = async () => {
     try {

@@ -4,7 +4,7 @@ import User from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB()
 
@@ -30,7 +30,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       )
     }
 
-    const notificationId = params.id
+    const resolvedParams = await params
+    const notificationId = resolvedParams.id
 
     // Find and update the notification
     const notification = await Notification.findOneAndUpdate(

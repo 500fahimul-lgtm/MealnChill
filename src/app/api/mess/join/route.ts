@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
 
     // Check if user is already a member
     const existingMember = mess.members.find(
-      member => member.userId.toString() === userId
+      (member: any) => member.userId.toString() === userId
     )
 
     if (existingMember) {

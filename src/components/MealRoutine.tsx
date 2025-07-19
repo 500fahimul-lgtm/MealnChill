@@ -12,7 +12,7 @@ import {
     WbSunny,
     WbTwilight
 } from '@mui/icons-material'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface MealRoutineItem {
   id: string
@@ -59,7 +59,7 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
     return dates
   }
 
-  const fetchMealRoutines = async () => {
+  const fetchMealRoutines = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
       const weekDates = getWeekDates(currentWeek)
@@ -81,11 +81,11 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [currentWeek])
 
   useEffect(() => {
     fetchMealRoutines()
-  }, [currentWeek])
+  }, [fetchMealRoutines])
 
   const handlePreviousWeek = () => {
     const newDate = new Date(currentWeek)

@@ -120,7 +120,7 @@ messSchema.pre('save', async function(next) {
       code = Math.random().toString(36).substring(2, 8).toUpperCase()
       
       // Check if this code already exists
-      const existingMess = await this.constructor.findOne({ messCode: code })
+      const existingMess = await (this.constructor as any).findOne({ messCode: code })
       if (!existingMess) {
         isUnique = true
       }

@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
         ])
 
         return {
-          id: member._id.toString(),
+          id: (member._id as any).toString(),
           name: member.name,
           email: member.email,
           phone: member.phone,

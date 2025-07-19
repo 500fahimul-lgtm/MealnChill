@@ -1,7 +1,7 @@
 'use client'
 
 import { LightbulbOutlined, MonetizationOn } from '@mui/icons-material'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface FinancialOverviewProps {
   messId: string
@@ -100,14 +100,7 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
   const [reportPeriod, setReportPeriod] = useState('all-time')
   const [reportLoading, setReportLoading] = useState(false)
 
-  useEffect(() => {
-    fetchFinancialData()
-    if (isAdmin) {
-      fetchPendingDeposits()
-    }
-  }, [messId, selectedPeriod])
-
-  const fetchFinancialData = async () => {
+  const fetchFinancialData = useCallback(async () => {
     try {
       setIsLoading(true)
       const token = localStorage.getItem('token')
@@ -168,9 +161,9 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [messId, selectedPeriod])
 
-  const fetchPendingDeposits = async () => {
+  const fetchPendingDeposits = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/deposits?status=pending&messId=${messId}`, {
@@ -186,7 +179,14 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
     } catch (error) {
       setMessage({ type: 'error', text: 'Failed to fetch pending deposits' })
     }
-  }
+  }, [messId, isAdmin])
+
+  useEffect(() => {
+    fetchFinancialData()
+    if (isAdmin) {
+      fetchPendingDeposits()
+    }
+  }, [fetchFinancialData, fetchPendingDeposits, isAdmin])
 
   const fetchReportData = async (period: string = reportPeriod) => {
     try {

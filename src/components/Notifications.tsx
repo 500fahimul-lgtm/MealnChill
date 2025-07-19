@@ -9,7 +9,7 @@ import {
     NotificationsNone,
     Warning
 } from '@mui/icons-material'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface NotificationItem {
   id: string
@@ -45,7 +45,7 @@ export default function Notifications({ messId, userId, onNotificationRead }: No
   const [filter, setFilter] = useState<'all' | 'unread'>('all')
   const [confirmationModal, setConfirmationModal] = useState<ConfirmationModal | null>(null)
 
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/notifications?filter=${filter}`, {
@@ -63,11 +63,11 @@ export default function Notifications({ messId, userId, onNotificationRead }: No
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [filter])
 
   useEffect(() => {
     fetchNotifications()
-  }, [filter])
+  }, [fetchNotifications])
 
   const markAsRead = async (notificationId: string) => {
     try {

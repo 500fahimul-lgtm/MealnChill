@@ -1,25 +1,25 @@
 'use client'
 
 import {
-    AccessTime,
-    AdminPanelSettings,
-    Assignment,
-    BarChart,
-    Block,
-    Build,
-    CheckCircle,
-    Close,
-    Email,
-    GpsFixed,
-    HourglassTop,
-    Info,
-    Kitchen,
-    Restaurant,
-    Save,
-    Undo,
-    Warning
+  AccessTime,
+  AdminPanelSettings,
+  Assignment,
+  BarChart,
+  Block,
+  Build,
+  CheckCircle,
+  Close,
+  Email,
+  GpsFixed,
+  HourglassTop,
+  Info,
+  Kitchen,
+  Restaurant,
+  Save,
+  Undo,
+  Warning
 } from '@mui/icons-material'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 interface AttendanceData {
   mealSlot: string
@@ -90,7 +90,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const getCurrentDateStr = () => new Date().toISOString().split('T')[0]
 
   // Deadline calculation function
-  const calculateDeadlineStatus = (mealSlot: string): DeadlineStatus => {
+  const calculateDeadlineStatus = useCallback((mealSlot: string): DeadlineStatus => {
     const now = new Date()
     const currentHour = now.getHours()
     const currentMinute = now.getMinutes()
@@ -133,7 +133,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       isPassed,
       canModify
     }
-  }
+  }, [mealDeadlines, isAdmin])
 
   // Helper function to format time to AM/PM
   const formatTimeToAMPM = (hour: number, minute: number): string => {
@@ -144,16 +144,20 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   }
 
   // Update deadline status for all meal slots
-  const updateDeadlineStatus = () => {
+  const updateDeadlineStatus = useCallback(() => {
     const newDeadlineStatus: Record<string, DeadlineStatus> = {}
-    mealSlots.forEach(slot => {
+    const slots = mealFrequency === 3 
+      ? [{ key: 'breakfast', name: 'Breakfast' }, { key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
+      : [{ key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
+    
+    slots.forEach(slot => {
       newDeadlineStatus[slot.key] = calculateDeadlineStatus(slot.key)
     })
     setDeadlineStatus(newDeadlineStatus)
-  }
+  }, [mealFrequency, calculateDeadlineStatus])
 
   // Fetch mess settings to get meal deadlines
-  const fetchMessSettings = async () => {
+  const fetchMessSettings = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
       const response = await fetch(`/api/mess/settings?messId=${messId}`, {
@@ -179,7 +183,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     } catch (error) {
       // Handle error silently
     }
-  }
+  }, [messId])
 
   // Set up real-time deadline checking
   useEffect(() => {
@@ -189,13 +193,13 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     const deadlineInterval = setInterval(updateDeadlineStatus, 60000)
     
     return () => clearInterval(deadlineInterval)
-  }, [isAdmin, mealDeadlines])
+  }, [updateDeadlineStatus])
 
   const mealSlots = mealFrequency === 3 
     ? [{ key: 'breakfast', name: 'Breakfast' }, { key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
     : [{ key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
 
-  const fetchAttendanceData = async () => {
+  const fetchAttendanceData = useCallback(async () => {
     try {
       setIsLoading(true)
       const token = localStorage.getItem('token')
@@ -222,7 +226,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [messId])
 
   useEffect(() => {
     // Fetch both mess settings and attendance data on component mount
@@ -232,7 +236,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     }
     
     initializeData()
-  }, [])
+  }, [fetchMessSettings, fetchAttendanceData])
 
   // Toggle functions that only update local state (no API call)
   const toggleMealStatus = (mealSlot: string, currentValue: boolean) => {
@@ -352,11 +356,11 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         
       } else {
         
-        showAlert('Failed to save changes. Please try again.', 'error')
+        console.error('Failed to save changes. Please try again.')
       }
     } catch (error) {
       
-      showAlert('Error saving changes. Please try again.', 'error')
+      console.error('Error saving changes. Please try again.')
     } finally {
       setSavingStates(prev => ({ ...prev, [mealSlot]: false }))
     }

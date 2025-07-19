@@ -19,7 +19,7 @@ const verifyToken = async (token: string) => {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB()
@@ -34,7 +34,8 @@ export async function POST(
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 
-    const cycleId = params.id
+    const resolvedParams = await params
+    const cycleId = resolvedParams.id
     const cycle = await BillingCycle.findById(cycleId)
 
     if (!cycle || cycle.messId.toString() !== decoded.messId) {

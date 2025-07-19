@@ -14,7 +14,7 @@ const verifyToken = async (token: string) => {
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await connectDB()
@@ -30,7 +30,8 @@ export async function POST(
     }
 
     const { status } = await request.json()
-    const settlementId = params.id
+    const resolvedParams = await params
+    const settlementId = resolvedParams.id
 
     if (!['paid', 'refunded', 'pending_refund', 'unpaid'].includes(status)) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 })
