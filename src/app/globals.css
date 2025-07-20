@@ -2,6 +2,204 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 
+ * MealNChill Form Components - Universal Styles
+ * Reusable CSS classes for consistent form styling across the application
+ */
+@layer components {
+  /* Base Input Field Styles */
+  .input-base {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply text-gray-900 bg-white placeholder-gray-500;
+    @apply disabled:bg-gray-100 disabled:cursor-not-allowed;
+  }
+
+  /* Large Input Variant */
+  .input-large {
+    @apply input-base p-3;
+  }
+
+  /* Small Input Variant */
+  .input-small {
+    @apply input-base text-sm px-2 py-1;
+  }
+
+  /* Extra Small Input Variant (for tight spaces) */
+  .input-xs {
+    @apply input-base text-xs p-1;
+  }
+
+  /* Number Input with Center Alignment */
+  .input-number {
+    @apply input-base text-center;
+  }
+
+  /* Number Input Small (for counters, quantities) */
+  .input-number-small {
+    @apply input-number text-sm w-16;
+  }
+
+  /* Search Input with Icon Space */
+  .input-search {
+    @apply input-base pl-10 pr-4;
+  }
+
+  /* Time Input */
+  .input-time {
+    @apply input-large font-mono;
+  }
+
+  /* Base Select Dropdown Styles */
+  .select-base {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-lg;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply text-gray-900 bg-white;
+    @apply disabled:bg-gray-100 disabled:cursor-not-allowed;
+  }
+
+  /* Large Select Variant */
+  .select-large {
+    @apply select-base p-3;
+  }
+
+  /* Small Select Variant */
+  .select-small {
+    @apply select-base text-sm px-2 py-1;
+  }
+
+  /* Extra Small Select Variant */
+  .select-xs {
+    @apply select-base text-xs p-2;
+  }
+
+  /* Textarea Base Styles */
+  .textarea-base {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg;
+    @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
+    @apply text-gray-900 bg-white placeholder-gray-400 resize-vertical;
+  }
+
+  /* Form Label Styles */
+  .label-base {
+    @apply block text-sm font-medium text-gray-700 mb-2;
+  }
+
+  .label-required::after {
+    content: " *";
+    @apply text-red-500;
+  }
+
+  /* Button Base Styles */
+  .btn-base {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200;
+    @apply focus:outline-none focus:ring-2 focus:ring-offset-2;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Primary Button */
+  .btn-primary {
+    @apply btn-base bg-primary-600 text-white hover:bg-primary-700;
+    @apply focus:ring-primary-500;
+  }
+
+  /* Secondary Button */
+  .btn-secondary {
+    @apply btn-base bg-gray-500 text-white hover:bg-gray-600;
+    @apply focus:ring-gray-500;
+  }
+
+  /* Success Button */
+  .btn-success {
+    @apply btn-base bg-green-600 text-white hover:bg-green-700;
+    @apply focus:ring-green-500;
+  }
+
+  /* Danger Button */
+  .btn-danger {
+    @apply btn-base bg-red-600 text-white hover:bg-red-700;
+    @apply focus:ring-red-500;
+  }
+
+  /* Small Button Variant */
+  .btn-small {
+    @apply px-3 py-1 text-sm;
+  }
+
+  /* Large Button Variant */
+  .btn-large {
+    @apply px-6 py-3 text-lg;
+  }
+
+  /* Form Group Container */
+  .form-group {
+    @apply mb-4;
+  }
+
+  .form-group-inline {
+    @apply flex items-center space-x-3;
+  }
+
+  /* Form Error Message */
+  .form-error {
+    @apply text-red-600 text-sm mt-1;
+  }
+
+  /* Form Help Text */
+  .form-help {
+    @apply text-gray-500 text-sm mt-1;
+  }
+
+  /* Form Section */
+  .form-section {
+    @apply mb-8 p-6 bg-white rounded-lg shadow-lg;
+  }
+
+  /* Search Container with Icon */
+  .search-container {
+    @apply relative;
+  }
+
+  .search-icon {
+    @apply absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none;
+  }
+
+  .search-clear {
+    @apply absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer;
+  }
+
+  /* Responsive Form Grid */
+  .form-grid {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-6;
+  }
+
+  .form-grid-3 {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-6;
+  }
+
+  /* Status Indicators */
+  .status-active {
+    @apply px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800;
+  }
+
+  .status-inactive {
+    @apply px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800;
+  }
+
+  .status-pending {
+    @apply px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800;
+  }
+
+  /* Card/Container Styles */
+  .card-base {
+    @apply bg-white rounded-lg shadow-lg p-6;
+  }
+
+  .card-border {
+    @apply border border-gray-200 rounded-lg p-4;
+  }
+}
+
 :root {
   --foreground-rgb: 0, 0, 0;
   --background-start-rgb: 214, 219, 220;

@@ -1,11 +1,11 @@
 'use client'
 
 import {
-    Block,
-    CalendarToday,
-    LightbulbOutlined,
-    Search,
-    Warning
+  Block,
+  CalendarToday,
+  LightbulbOutlined,
+  Search,
+  Warning
 } from '@mui/icons-material';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -506,7 +506,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                     />
                   ) : (
                     <p className="text-lg text-gray-900">{messData.name}</p>
@@ -521,7 +521,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                     <select
                       value={formData.mealFrequency}
                       onChange={(e) => setFormData({ ...formData, mealFrequency: parseInt(e.target.value) })}
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                     >
                       <option value={2}>2 Meals/day (Lunch, Dinner)</option>
                       <option value={3}>3 Meals/day (Breakfast, Lunch, Dinner)</option>
@@ -577,7 +577,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                             ...formData, 
                             mealDeadlines: { ...formData.mealDeadlines, breakfast: e.target.value } 
                           })}
-                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                          className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                         />
                       ) : (
                         <p className="text-lg text-gray-900 font-mono">
@@ -599,7 +599,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                           ...formData, 
                           mealDeadlines: { ...formData.mealDeadlines, lunch: e.target.value } 
                         })}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                       />
                     ) : (
                       <p className="text-lg text-gray-900 font-mono">
@@ -620,7 +620,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                           ...formData, 
                           mealDeadlines: { ...formData.mealDeadlines, dinner: e.target.value } 
                         })}
-                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                       />
                     ) : (
                       <p className="text-lg text-gray-900 font-mono">
@@ -723,7 +723,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                   placeholder="Search members by name, email, or phone..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900"
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
                 />
                 {searchTerm && (
                   <button
@@ -855,7 +855,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                                     <select
                                       value={memberMealData.breakfast?.status || 'off'}
                                       onChange={(e) => updateMemberMeal(member.userId, 'breakfast', 'status', e.target.value)}
-                                      className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900"
+                                      className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900 bg-white"
                                     >
                                       <option value="off">Off</option>
                                       <option value="on">On</option>
@@ -868,7 +868,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                                         max="5"
                                         value={memberMealData.breakfast?.extra || 0}
                                         onChange={(e) => updateMemberMeal(member.userId, 'breakfast', 'extra', parseInt(e.target.value) || 0)}
-                                        className="w-16 text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900"
+                                        className="w-16 text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900 bg-white"
                                       />
                                     </div>
                                   </div>
@@ -882,7 +882,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                                   <select
                                     value={memberMealData.lunch?.status || 'off'}
                                     onChange={(e) => updateMemberMeal(member.userId, 'lunch', 'status', e.target.value)}
-                                    className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900"
+                                    className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900 bg-white"
                                   >
                                     <option value="off">Off</option>
                                     <option value="on">On</option>
@@ -895,7 +895,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                                       max="5"
                                       value={memberMealData.lunch?.extra || 0}
                                       onChange={(e) => updateMemberMeal(member.userId, 'lunch', 'extra', parseInt(e.target.value) || 0)}
-                                      className="w-16 text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900"
+                                      className="w-16 text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900 bg-white"
                                     />
                                   </div>
                                 </div>
@@ -908,7 +908,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                                   <select
                                     value={memberMealData.dinner?.status || 'off'}
                                     onChange={(e) => updateMemberMeal(member.userId, 'dinner', 'status', e.target.value)}
-                                    className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900"
+                                    className="w-full text-xs p-2 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900 bg-white"
                                   >
                                     <option value="off">Off</option>
                                     <option value="on">On</option>
@@ -921,7 +921,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                                       max="5"
                                       value={memberMealData.dinner?.extra || 0}
                                       onChange={(e) => updateMemberMeal(member.userId, 'dinner', 'extra', parseInt(e.target.value) || 0)}
-                                      className="w-16 text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900"
+                                      className="w-16 text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900 bg-white"
                                     />
                                   </div>
                                 </div>

@@ -400,7 +400,7 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
           <select
             value={selectedPeriod}
             onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white"
           >
             <option value="current-month">Current Month</option>
             <option value="last-month">Last Month</option>
@@ -730,7 +730,7 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
                     setReportPeriod(e.target.value)
                     fetchReportData(e.target.value)
                   }}
-                  className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 text-gray-900 bg-white"
                 >
                   <option value="current-month">Current Month</option>
                   <option value="last-month">Last Month</option>

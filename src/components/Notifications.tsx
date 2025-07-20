@@ -234,7 +234,7 @@ export default function Notifications({ messId, userId, onNotificationRead }: No
           <select
             value={filter}
             onChange={(e) => setFilter(e.target.value as 'all' | 'unread')}
-            className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 text-gray-900 bg-white"
           >
             <option value="all">All</option>
             <option value="unread">Unread</option>
