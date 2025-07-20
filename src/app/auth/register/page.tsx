@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -14,7 +14,51 @@ export default function Register() {
   })
   const [errors, setErrors] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
   const router = useRouter()
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      const token = localStorage.getItem('token')
+      if (token) {
+        try {
+          const response = await fetch('/api/user/profile', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+          
+          if (response.ok) {
+            // User is already logged in, redirect to home/dashboard
+            router.replace('/')
+            return
+          } else {
+            // Token is invalid, remove it
+            localStorage.removeItem('token')
+          }
+        } catch (error) {
+          // Network error or invalid token, remove it
+          localStorage.removeItem('token')
+        }
+      }
+      setIsCheckingAuth(false)
+    }
+
+    checkAuthStatus()
+  }, [router])
+
+  // Show loading while checking authentication
+  if (isCheckingAuth) {
+    return (
+      <main className="min-h-screen bg-gradient-to-br from-amber-50 to-orange-100 flex items-center justify-center p-6">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-orange-600 mx-auto mb-4"></div>
+          <p className="text-slate-600 font-medium">Checking authentication...</p>
+        </div>
+      </main>
+    )
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target

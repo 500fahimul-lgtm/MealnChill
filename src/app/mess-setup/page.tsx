@@ -92,7 +92,7 @@ function JoinMessForm() {
           localStorage.setItem('token', data.token)
         }
         
-        router.push('/dashboard')
+        router.push('/') // Redirect to home page (which is now the dashboard)
       } else {
         const data = await response.json()
         setError(data.message || 'Failed to join mess')
@@ -191,7 +191,7 @@ function CreateMessForm() {
           localStorage.setItem('token', data.token)
         }
         
-        router.push('/dashboard')
+        router.push('/') // Redirect to home page (which is now the dashboard)
       } else {
         const data = await response.json()
         setError(data.message || 'Failed to create mess')
