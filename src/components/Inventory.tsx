@@ -1,24 +1,23 @@
 'use client'
 
 import {
-    Add,
-    AutoMode,
-    Category,
-    CheckCircle,
-    Close,
-    Delete,
-    Edit,
-    History,
-    HourglassTop,
-    Info,
-    Inventory2,
-    Person,
-    Save,
-    Scale,
-    Schedule,
-    TrendingDown,
-    TrendingUp,
-    Warning
+  Add,
+  Category,
+  CheckCircle,
+  Close,
+  Delete,
+  Edit,
+  History,
+  HourglassTop,
+  Info,
+  Inventory2,
+  Person,
+  Save,
+  Scale,
+  Schedule,
+  TrendingDown,
+  TrendingUp,
+  Warning
 } from '@mui/icons-material'
 import { useEffect, useState } from 'react'
 
@@ -28,6 +27,7 @@ interface InventoryItem {
   category: string
   quantity: number
   unit: string
+  lowStockThreshold: number
   lastUpdated: string
   updatedByUserId: string
 }
@@ -67,7 +67,8 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
     itemName: '',
     category: 'Other',
     quantity: '',
-    unit: 'kg'
+    unit: 'kg',
+    lowStockThreshold: '10'
   })
   const [editForm, setEditForm] = useState({
     id: '',
@@ -75,6 +76,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
     quantity: '',
     unit: '',
     category: '',
+    lowStockThreshold: '10',
     originalQuantity: 0
   })
   const [isProcessing, setIsProcessing] = useState(false)
@@ -146,13 +148,14 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
           itemName: stockForm.itemName.trim(),
           quantity: parseFloat(stockForm.quantity),
           unit: stockForm.unit.trim(),
-          category: stockForm.category || undefined
+          category: stockForm.category || undefined,
+          lowStockThreshold: parseFloat(stockForm.lowStockThreshold) || 10
         })
       })
 
       if (response.ok) {
         setMessage('Stock updated successfully')
-        setStockForm({ itemName: '', quantity: '', unit: 'kg', category: '' })
+        setStockForm({ itemName: '', quantity: '', unit: 'kg', category: 'Other', lowStockThreshold: '10' })
         setShowAddStock(false)
         await fetchInventory()
       } else {
@@ -173,6 +176,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
       quantity: item.quantity.toString(),
       unit: item.unit,
       category: item.category,
+      lowStockThreshold: item.lowStockThreshold.toString(),
       originalQuantity: item.quantity
     })
     setShowEditStock(true)
@@ -273,7 +277,8 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
         },
         body: JSON.stringify({
           id: editForm.id,
-          quantity: parseFloat(editForm.quantity)
+          quantity: parseFloat(editForm.quantity),
+          lowStockThreshold: parseFloat(editForm.lowStockThreshold) || 10
         })
       })
 
@@ -285,6 +290,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
           quantity: '',
           unit: '',
           category: '',
+          lowStockThreshold: '10',
           originalQuantity: 0
         })
         setShowEditStock(false)
@@ -300,15 +306,14 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
     }
   }
 
-  const getStockStatusColor = (quantity: number) => {
-    if (quantity <= 10) return 'text-red-600 bg-red-50'
-    if (quantity <= 20) return 'text-yellow-600 bg-yellow-50'
+  const getStockStatusColor = (quantity: number, threshold: number) => {
+    if (quantity <= threshold) return 'text-red-600 bg-red-50'
+    if (quantity <= threshold * 2) return 'text-yellow-600 bg-yellow-50'
     return 'text-green-600 bg-green-50'
   }
 
-  const getStockStatusIcon = (quantity: number) => {
-    if (quantity <= 10) return <Warning className="text-red-600" />
-    if (quantity <= 20) return <HourglassTop className="text-yellow-600" />
+  const getStockStatusIcon = (quantity: number, threshold: number) => {
+    if (quantity <= threshold) return <Warning className="text-red-600" />
     return <CheckCircle className="text-green-600" />
   }
 
@@ -398,7 +403,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
           {items.map((item) => (
             <div 
               key={item._id} 
-              className={`relative border-2 rounded-xl p-4 sm:p-6 transition-all duration-200 hover:shadow-lg group ${getStockStatusColor(item.quantity)} border-current backdrop-blur-sm`}
+              className={`relative border-2 rounded-xl p-4 sm:p-6 transition-all duration-200 hover:shadow-lg group ${getStockStatusColor(item.quantity, item.lowStockThreshold)} border-current backdrop-blur-sm`}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
@@ -413,7 +418,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
                   )}
                 </div>
                 <div className="text-3xl opacity-80">
-                  {getStockStatusIcon(item.quantity)}
+                  {getStockStatusIcon(item.quantity, item.lowStockThreshold)}
                 </div>
               </div>
               
@@ -481,23 +486,14 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
                 </div>
               )}
 
-              {item.quantity <= 10 && (
+              {item.quantity <= item.lowStockThreshold && (
                 <div className="mt-4 p-3 bg-red-100 border border-red-300 rounded-lg text-xs sm:text-sm text-red-800">
                   <div className="flex items-center">
                     <Warning className="mr-2 text-red-600" />
                     <div>
                       <strong>Low Stock Alert!</strong>
-                      <div className="text-red-600 mt-1">Consider restocking soon to avoid shortages.</div>
+                      <div className="text-red-600 mt-1">Stock is at or below {item.lowStockThreshold} {item.unit}. Consider restocking soon.</div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {item.quantity <= 20 && item.quantity > 10 && (
-                <div className="mt-4 p-3 bg-yellow-100 border border-yellow-300 rounded-lg text-xs sm:text-sm text-yellow-800">
-                  <div className="flex items-center">
-                    <HourglassTop className="mr-2 text-yellow-600" />
-                    <strong>Moderate Stock Level</strong>
                   </div>
                 </div>
               )}
@@ -518,7 +514,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
               <button
                 onClick={() => {
                   setShowAddStock(false)
-                  setStockForm({ itemName: '', quantity: '', unit: 'kg', category: '' })
+                  setStockForm({ itemName: '', quantity: '', unit: 'kg', category: 'Other', lowStockThreshold: '10' })
                 }}
                 className="text-gray-400 hover:text-gray-600 text-2xl"
               >
@@ -596,18 +592,27 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
                 </select>
                 <p className="text-xs text-gray-500 mt-2 flex items-center">
                   <Category className="mr-1 text-gray-400" style={{ fontSize: '0.875rem' }} />
-                  Helps with automatic counting and meal routine planning
+                  Helps organize and categorize your inventory items
                 </p>
               </div>
 
-              <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-300 rounded-xl p-4">
-                <h5 className="text-sm font-bold text-yellow-800 mb-2 flex items-center">
-                  <AutoMode className="mr-2 text-yellow-600" />
-                  Automatic Deduction
-                </h5>
-                <p className="text-xs text-yellow-700 leading-relaxed">
-                  Items like eggs, chicken pieces, and fish pieces will be automatically deducted 
-                  based on meal routines and attendance. Make sure to use "pieces" as the unit for these items.
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Low Stock Alert Threshold
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={stockForm.lowStockThreshold}
+                  onChange={(e) => setStockForm(prev => ({ ...prev, lowStockThreshold: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent text-gray-900 bg-white placeholder-gray-400"
+                  placeholder="10"
+                  required
+                />
+                <p className="text-xs text-gray-500 mt-2 flex items-center">
+                  <Warning className="mr-1 text-gray-400" style={{ fontSize: '0.875rem' }} />
+                  You'll get alerts when stock goes below this level
                 </p>
               </div>
 
@@ -616,7 +621,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
                   type="button"
                   onClick={() => {
                     setShowAddStock(false)
-                    setStockForm({ itemName: '', quantity: '', unit: 'kg', category: '' })
+                    setStockForm({ itemName: '', quantity: '', unit: 'kg', category: 'Other', lowStockThreshold: '10' })
                   }}
                   className="px-6 py-3 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors duration-200 font-medium"
                 >
@@ -663,6 +668,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
                     quantity: '',
                     unit: '',
                     category: '',
+                    lowStockThreshold: '10',
                     originalQuantity: 0
                   })
                 }}
@@ -714,6 +720,25 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
                 </p>
               </div>
 
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  Low Stock Alert Threshold
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editForm.lowStockThreshold}
+                  onChange={(e) => setEditForm(prev => ({ ...prev, lowStockThreshold: e.target.value }))}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                  placeholder="Enter low stock threshold"
+                />
+                <p className="text-xs text-gray-500 mt-2 flex items-center">
+                  <Info className="mr-1 text-gray-400" style={{ fontSize: '0.875rem' }} />
+                  You'll be alerted when stock falls below this threshold
+                </p>
+              </div>
+
               <div className="flex flex-col sm:flex-row justify-end space-y-3 sm:space-y-0 sm:space-x-3 pt-4">
                 <button
                   type="button"
@@ -725,6 +750,7 @@ export default function Inventory({ messId, isAdmin }: InventoryProps) {
                       quantity: '',
                       unit: '',
                       category: '',
+                      lowStockThreshold: '10',
                       originalQuantity: 0
                     })
                   }}

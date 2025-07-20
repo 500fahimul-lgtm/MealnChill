@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 
-    const { itemName, quantity, unit, category } = await request.json()
+    const { itemName, quantity, unit, category, lowStockThreshold } = await request.json()
 
     // Validate required fields
     if (!itemName || !quantity || !unit) {
@@ -75,6 +75,7 @@ export async function POST(request: NextRequest) {
       previousQuantity = existingItem.quantity
       existingItem.quantity += parseFloat(quantity)
       existingItem.category = category || existingItem.category
+      if (lowStockThreshold !== undefined) existingItem.lowStockThreshold = parseFloat(lowStockThreshold)
       existingItem.updatedByUserId = decoded.userId
       savedItem = await existingItem.save()
       action = 'UPDATE'
@@ -86,6 +87,7 @@ export async function POST(request: NextRequest) {
         quantity: parseFloat(quantity),
         unit: unit.toLowerCase(),
         category: category || 'Other',
+        lowStockThreshold: lowStockThreshold !== undefined ? parseFloat(lowStockThreshold) : 10,
         updatedByUserId: decoded.userId
       })
       savedItem = await inventoryItem.save()
@@ -129,7 +131,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 
-    const { id, quantity, itemName, category, unit } = await request.json()
+    const { id, quantity, itemName, category, unit, lowStockThreshold } = await request.json()
 
     if (!id || quantity === undefined) {
       return NextResponse.json({ message: 'Missing required fields' }, { status: 400 })
@@ -145,11 +147,13 @@ export async function PUT(request: NextRequest) {
     const previousItemName = item.itemName
     const previousCategory = item.category
     const previousUnit = item.unit
+    const previousLowStockThreshold = item.lowStockThreshold
 
     // Update the item with new values
     if (itemName) item.itemName = itemName.trim()
     if (category) item.category = category
     if (unit) item.unit = unit.toLowerCase()
+    if (lowStockThreshold !== undefined) item.lowStockThreshold = parseFloat(lowStockThreshold)
     item.quantity = parseFloat(quantity)
     item.updatedByUserId = decoded.userId
     const savedItem = await item.save()
@@ -168,6 +172,9 @@ export async function PUT(request: NextRequest) {
     }
     if (unit && previousUnit !== savedItem.unit) {
       changes.push(`unit from "${previousUnit}" to "${savedItem.unit}"`)
+    }
+    if (lowStockThreshold !== undefined && previousLowStockThreshold !== savedItem.lowStockThreshold) {
+      changes.push(`low stock alert from ${previousLowStockThreshold} to ${savedItem.lowStockThreshold}`)
     }
     if (changes.length > 0) {
       reason += ' ' + changes.join(', ')

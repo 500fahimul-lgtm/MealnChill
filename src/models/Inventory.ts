@@ -29,6 +29,11 @@ const inventorySchema = new mongoose.Schema({
     trim: true,
     lowercase: true,
   },
+  lowStockThreshold: {
+    type: Number,
+    default: 10,
+    min: [0, 'Low stock threshold cannot be negative'],
+  },
   lastUpdated: {
     type: Date,
     default: Date.now,

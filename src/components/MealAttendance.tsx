@@ -61,6 +61,31 @@ interface ConfirmationModal {
   type?: 'warning' | 'danger' | 'info'
 }
 
+interface InventoryItem {
+  _id: string
+  itemName: string
+  category: string
+  quantity: number
+  unit: string
+  lastUpdated: string
+}
+
+interface InventoryDeductionItem {
+  itemId: string
+  itemName: string
+  currentQuantity: number
+  quantityToDeduct: number
+  unit: string
+}
+
+interface InventoryModal {
+  isOpen: boolean
+  mealSlot: string
+  totalMeals: number
+  onConfirm: (items: InventoryDeductionItem[]) => void
+  onCancel: () => void
+}
+
 interface MealAttendanceProps {
   messId: string
   userId: string
@@ -81,6 +106,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const [updatingStates, setUpdatingStates] = useState<{[key: string]: boolean}>({})
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [confirmationModal, setConfirmationModal] = useState<ConfirmationModal | null>(null)
+  const [inventoryModal, setInventoryModal] = useState<InventoryModal | null>(null)
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
+  const [selectedInventoryItems, setSelectedInventoryItems] = useState<InventoryDeductionItem[]>([])
   
   // Local state for pending changes (not yet saved)
   const [pendingChanges, setPendingChanges] = useState<{[key: string]: {isMealOn?: boolean, extraMealCount?: number}}>({})
@@ -227,6 +255,25 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       setIsLoading(false)
     }
   }, [messId])
+
+  // Fetch inventory items
+  const fetchInventoryItems = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/inventory', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setInventoryItems(data.inventory || [])
+      }
+    } catch (error) {
+      // Handle error silently
+    }
+  }, [])
 
   useEffect(() => {
     // Fetch both mess settings and attendance data on component mount
@@ -438,27 +485,64 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       return
     }
 
-    // Show in-app confirmation modal instead of browser confirm
+    // Fetch inventory items first
+    await fetchInventoryItems()
+
+    // Show inventory deduction modal
+    setSelectedInventoryItems([]) // Reset selected items
+    setInventoryModal({
+      isOpen: true,
+      mealSlot,
+      totalMeals: summary.overallTotalMeals,
+      onConfirm: (selectedItems) => {
+        setInventoryModal(null)
+        // Now show the preparation confirmation with the selected inventory items
+        showPreparationConfirmation(mealSlot, selectedItems)
+      },
+      onCancel: () => {
+        setInventoryModal(null)
+        setSelectedInventoryItems([])
+      }
+    })
+  }
+
+  // Show preparation confirmation after inventory selection
+  const showPreparationConfirmation = (mealSlot: string, inventoryItems: InventoryDeductionItem[]) => {
+    const itemsText = inventoryItems.length > 0 
+      ? `\n\nInventory items to be deducted:\n${inventoryItems.map(item => `• ${item.quantityToDeduct} ${item.unit} of ${item.itemName}`).join('\n')}`
+      : '\n\nNo inventory items will be deducted.'
+
     showConfirmation({
       title: 'Mark Meal as Prepared',
-      message: `Mark ${mealSlot} as prepared and served? This will deduct inventory items and cannot be undone.`,
+      message: `Mark ${mealSlot} as prepared and served?${itemsText}`,
       confirmText: 'Mark as Prepared',
       cancelText: 'Cancel',
       type: 'warning',
       onConfirm: async () => {
         hideConfirmation()
-        await executeMealPreparation(mealSlot)
+        await executeMealPreparation(mealSlot, inventoryItems)
       },
       onCancel: hideConfirmation
     })
   }
 
-  const executeMealPreparation = async (mealSlot: string) => {
+  const executeMealPreparation = async (mealSlot: string, inventoryItems: InventoryDeductionItem[] = []) => {
     setUpdatingStates(prev => ({ ...prev, [`${mealSlot}_preparing`]: true }))
 
     try {
       const token = localStorage.getItem('token')
       const dateStr = getCurrentDateStr()
+      
+      const requestBody = {
+        date: dateStr,
+        mealSlot,
+        inventoryItems: inventoryItems.map(item => ({
+          itemId: item.itemId,
+          quantityToDeduct: item.quantityToDeduct
+        }))
+      }
+      
+      console.log('DEBUG: Sending meal preparation request:', requestBody)
       
       const response = await fetch('/api/meal-preparation', {
         method: 'POST',
@@ -466,16 +550,18 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          date: dateStr,
-          mealSlot,
-        })
+        body: JSON.stringify(requestBody)
       })
 
       const responseData = await response.json()
 
       if (response.ok) {
-        showToast(`${mealSlot} marked as prepared! Inventory items have been deducted.`, 'success')
+        if (inventoryItems.length > 0) {
+          const itemsList = inventoryItems.map(item => `${item.quantityToDeduct} ${item.unit} of ${item.itemName}`).join(', ')
+          showToast(`${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} marked as prepared! Inventory items have been deducted: ${itemsList}`, 'success')
+        } else {
+          showToast(`${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} marked as prepared successfully!`, 'success')
+        }
         // Refresh data to show updated status
         await fetchAttendanceData()
       } else {
@@ -533,7 +619,21 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       const responseData = await response.json()
 
       if (response.ok) {
-        showToast(`${mealSlot} marked as not served! Inventory items have been restored.`, 'success')
+        // Check if inventory items were restored from the response
+        if (responseData.inventoryUpdates && responseData.inventoryUpdates.length > 0) {
+          const restoredItems = responseData.inventoryUpdates
+            .filter(update => update.status === 'restored')
+            .map(update => `${update.restored} ${update.unit} of ${update.item}`)
+            .join(', ')
+          
+          if (restoredItems) {
+            showToast(`${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} marked as not served! Inventory items have been restored: ${restoredItems}`, 'success')
+          } else {
+            showToast(`${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} marked as not served!`, 'success')
+          }
+        } else {
+          showToast(`${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} marked as not served!`, 'success')
+        }
         // Refresh data to show updated status
         await fetchAttendanceData()
       } else {
@@ -992,35 +1092,81 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       </div>
 
       {/* Toast Notifications */}
-      <div className="fixed bottom-4 right-4 z-50 space-y-2">
+      <div className="fixed bottom-4 right-4 z-50 space-y-3 max-w-md">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-300 transform ${
-              toast.type === 'success' ? 'border-l-4 border-green-400' :
-              toast.type === 'error' ? 'border-l-4 border-red-400' :
-              toast.type === 'warning' ? 'border-l-4 border-yellow-400' :
-              'border-l-4 border-blue-400'
+            className={`w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-500 transform hover:scale-105 ${
+              toast.type === 'success' ? 'border-l-4 border-green-500' :
+              toast.type === 'error' ? 'border-l-4 border-red-500' :
+              toast.type === 'warning' ? 'border-l-4 border-yellow-500' :
+              'border-l-4 border-blue-500'
             }`}
           >
             <div className="p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  {toast.type === 'success' && <CheckCircle className="text-green-400" />}
-                  {toast.type === 'error' && <Close className="text-red-400" />}
-                  {toast.type === 'warning' && <Warning className="text-yellow-400" />}
-                  {toast.type === 'info' && <Info className="text-blue-400" />}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    toast.type === 'success' ? 'bg-green-100' :
+                    toast.type === 'error' ? 'bg-red-100' :
+                    toast.type === 'warning' ? 'bg-yellow-100' :
+                    'bg-blue-100'
+                  }`}>
+                    {toast.type === 'success' && <CheckCircle className="text-green-600 text-lg" />}
+                    {toast.type === 'error' && <Close className="text-red-600 text-lg" />}
+                    {toast.type === 'warning' && <Warning className="text-yellow-600 text-lg" />}
+                    {toast.type === 'info' && <Info className="text-blue-600 text-lg" />}
+                  </div>
                 </div>
-                <div className="ml-3 w-0 flex-1 pt-0.5">
-                  <p className="text-sm font-medium text-gray-900">{toast.message}</p>
+                <div className="ml-3 flex-1">
+                  <div className={`text-sm font-semibold mb-1 ${
+                    toast.type === 'success' ? 'text-green-800' :
+                    toast.type === 'error' ? 'text-red-800' :
+                    toast.type === 'warning' ? 'text-yellow-800' :
+                    'text-blue-800'
+                  }`}>
+                    {toast.type === 'success' && 'Success'}
+                    {toast.type === 'error' && 'Error'}
+                    {toast.type === 'warning' && 'Warning'}
+                    {toast.type === 'info' && 'Info'}
+                  </div>
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {/* Parse the message for better formatting */}
+                    {toast.message.includes('Inventory items have been') ? (
+                      <div className="space-y-1">
+                        <div className="font-medium">{toast.message.split('Inventory items have been')[0].trim()}</div>
+                        <div className="text-xs bg-gray-50 p-2 rounded border-l-2 border-gray-300">
+                          <div className="font-medium text-gray-600 mb-1">Items processed:</div>
+                          {toast.message.split('Inventory items have been deducted: ')[1]?.split(', ').map((item, index) => (
+                            <div key={index} className="flex items-center text-gray-600">
+                              <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                              {item}
+                            </div>
+                          )) || toast.message.split('Inventory items have been restored: ')[1]?.split(', ').map((item, index) => (
+                            <div key={index} className="flex items-center text-gray-600">
+                              <span className="w-2 h-2 bg-gray-400 rounded-full mr-2"></span>
+                              {item}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div>{toast.message}</div>
+                    )}
+                  </div>
                 </div>
-                <div className="ml-4 flex-shrink-0 flex">
+                <div className="ml-3 flex-shrink-0">
                   <button
-                    className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none"
+                    className={`rounded-md p-1 inline-flex hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${
+                      toast.type === 'success' ? 'text-green-400 hover:text-green-500 focus:ring-green-500' :
+                      toast.type === 'error' ? 'text-red-400 hover:text-red-500 focus:ring-red-500' :
+                      toast.type === 'warning' ? 'text-yellow-400 hover:text-yellow-500 focus:ring-yellow-500' :
+                      'text-blue-400 hover:text-blue-500 focus:ring-blue-500'
+                    }`}
                     onClick={() => removeToast(toast.id)}
                   >
                     <span className="sr-only">Close</span>
-                    <Close />
+                    <Close className="text-lg" />
                   </button>
                 </div>
               </div>
@@ -1079,6 +1225,178 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                   onClick={confirmationModal.onCancel}
                 >
                   {confirmationModal.cancelText || 'Cancel'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Inventory Selection Modal */}
+      {inventoryModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={inventoryModal.onCancel}></div>
+            
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <Kitchen className="text-blue-600" />
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left flex-1">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900 mb-2">
+                      Select Inventory Items to Deduct
+                    </h3>
+                    <div className="mt-2 mb-4">
+                      <p className="text-sm text-gray-500 mb-2">
+                        Preparing {inventoryModal.totalMeals} meals for {inventoryModal.mealSlot}. Select items to deduct from inventory:
+                      </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <p className="text-xs text-blue-700">
+                          💡 <strong>Tip:</strong> You can skip items or adjust quantities as needed. Only selected items will be deducted from inventory.
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {/* Inventory Items List */}
+                    <div className="max-h-96 overflow-y-auto">
+                      {inventoryItems.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          <Restaurant className="mx-auto mb-2 text-gray-300" style={{ fontSize: '2rem' }} />
+                          <p>No inventory items found</p>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {inventoryItems.map((item) => {
+                            const selectedItem = selectedInventoryItems.find(si => si.itemId === item._id)
+                            const isSelected = !!selectedItem
+                            const quantityToDeduct = selectedItem?.quantityToDeduct || 0
+                            
+                            return (
+                              <div key={item._id} className={`border-2 rounded-lg p-4 transition-all ${
+                                isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
+                              }`}>
+                                <div className="flex items-start justify-between mb-3">
+                                  <div className="flex-1">
+                                    <h4 className="font-medium text-gray-900">{item.itemName}</h4>
+                                    <p className="text-sm text-gray-600">{item.category}</p>
+                                    <p className="text-sm text-gray-500">
+                                      Available: {item.quantity} {item.unit}
+                                    </p>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      if (isSelected) {
+                                        setSelectedInventoryItems(prev => 
+                                          prev.filter(si => si.itemId !== item._id)
+                                        )
+                                      } else {
+                                        setSelectedInventoryItems(prev => [...prev, {
+                                          itemId: item._id,
+                                          itemName: item.itemName,
+                                          currentQuantity: item.quantity,
+                                          quantityToDeduct: 0,
+                                          unit: item.unit
+                                        }])
+                                      }
+                                    }}
+                                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
+                                      isSelected 
+                                        ? 'bg-red-100 text-red-800 hover:bg-red-200' 
+                                        : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
+                                    }`}
+                                  >
+                                    {isSelected ? 'Remove' : 'Add'}
+                                  </button>
+                                </div>
+                                
+                                {isSelected && (
+                                  <div className="space-y-2">
+                                    <div className="flex items-center space-x-2">
+                                      <label className="text-sm font-medium text-gray-700">
+                                        Quantity to deduct:
+                                      </label>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        max={item.quantity}
+                                        step="0.01"
+                                        value={quantityToDeduct}
+                                        onChange={(e) => {
+                                          const value = Math.max(0, Math.min(item.quantity, parseFloat(e.target.value) || 0))
+                                          setSelectedInventoryItems(prev => 
+                                            prev.map(si => 
+                                              si.itemId === item._id 
+                                                ? { ...si, quantityToDeduct: value }
+                                                : si
+                                            )
+                                          )
+                                        }}
+                                        className="w-24 px-2 py-1 border border-gray-300 rounded text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="0"
+                                      />
+                                      <span className="text-sm text-gray-500">{item.unit}</span>
+                                    </div>
+                                    {quantityToDeduct > 0 && (
+                                      <p className="text-xs text-green-600">
+                                        Remaining after deduction: {(item.quantity - quantityToDeduct).toFixed(2)} {item.unit}
+                                      </p>
+                                    )}
+                                    {quantityToDeduct > item.quantity && (
+                                      <p className="text-xs text-red-600">
+                                        ⚠️ Insufficient stock! Only {item.quantity} {item.unit} available.
+                                      </p>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* Selected Items Summary */}
+                    {selectedInventoryItems.length > 0 && (
+                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <h4 className="font-medium text-green-800 mb-2">Items to be deducted:</h4>
+                        <ul className="text-sm text-green-700 space-y-1">
+                          {selectedInventoryItems
+                            .filter(item => item.quantityToDeduct > 0)
+                            .map(item => (
+                              <li key={item.itemId}>
+                                • {item.quantityToDeduct} {item.unit} of {item.itemName}
+                              </li>
+                            ))}
+                        </ul>
+                        {selectedInventoryItems.filter(item => item.quantityToDeduct > 0).length === 0 && (
+                          <p className="text-sm text-yellow-600">No quantities specified yet</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => {
+                    const validItems = selectedInventoryItems.filter(item => item.quantityToDeduct > 0)
+                    inventoryModal.onConfirm(validItems)
+                  }}
+                >
+                  Continue to Mark as Prepared
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={inventoryModal.onCancel}
+                >
+                  Cancel
                 </button>
               </div>
             </div>

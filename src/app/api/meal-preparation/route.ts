@@ -1,5 +1,7 @@
+import { logInventoryChange } from '@/lib/inventoryLogger'
 import connectDB from '@/lib/mongodb'
 import Inventory from '@/models/Inventory'
+import InventoryRecord from '@/models/InventoryRecord'
 import MealAttendance from '@/models/MealAttendance'
 import MealRoutine from '@/models/MealRoutine'
 import User from '@/models/User'
@@ -32,7 +34,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Only admins can mark meals as prepared' }, { status: 403 })
     }
 
-    const { date, mealSlot } = await req.json()
+    const { date, mealSlot, inventoryItems = [] } = await req.json()
     
     if (!date || !mealSlot) {
       return NextResponse.json({ message: 'Date and meal slot are required' }, { status: 400 })
@@ -43,6 +45,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'User is not part of any mess' }, { status: 400 })
     }
 
+    console.log(`DEBUG: User messId: ${messId}, type: ${typeof messId}`)
     console.log(`DEBUG: Processing meal preparation for ${mealSlot} on ${date}`)
 
     // Parse date to ensure proper format
@@ -140,88 +143,108 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'No meals to prepare for this slot' }, { status: 400 })
     }
 
-    // Calculate inventory deductions
-    const inventoryUpdates = []
-    
-    // Eggs
-    if (mealRoutine.eggPerPersonQty > 0) {
-      const totalEggs = mealRoutine.eggPerPersonQty * totalMeals
-      inventoryUpdates.push({
-        itemName: 'Eggs',
-        unit: 'pieces',
-        quantityToDeduct: totalEggs
-      })
-    }
+    console.log(`DEBUG: Processing ${inventoryItems.length} custom inventory items`)
+    console.log(`DEBUG: Received inventory items:`, JSON.stringify(inventoryItems, null, 2))
 
-    // Chicken pieces
-    if (mealRoutine.chickenPiecePerPersonQty > 0) {
-      const totalChickenPieces = mealRoutine.chickenPiecePerPersonQty * totalMeals
-      inventoryUpdates.push({
-        itemName: 'Chicken Pieces',
-        unit: 'pieces',
-        quantityToDeduct: totalChickenPieces
-      })
-    }
-
-    // Fish pieces
-    if (mealRoutine.fishPiecePerPersonQty > 0) {
-      const totalFishPieces = mealRoutine.fishPiecePerPersonQty * totalMeals
-      inventoryUpdates.push({
-        itemName: 'Fish Pieces',
-        unit: 'pieces',
-        quantityToDeduct: totalFishPieces
-      })
-    }
-
-    console.log(`DEBUG: Inventory updates needed:`, inventoryUpdates)
-
-    // Update inventory items
+    // Process custom inventory items selected by admin
     const inventoryResults = []
-    for (const update of inventoryUpdates) {
+    for (const customItem of inventoryItems) {
       try {
-        // Find inventory item (case-insensitive search)
+        // Find inventory item by ID
+        console.log(`DEBUG: Looking for inventory item with ID: ${customItem.itemId} in mess: ${messId}`)
+        
+        // Validate ObjectId format
+        if (!customItem.itemId || !customItem.itemId.match(/^[0-9a-fA-F]{24}$/)) {
+          console.log(`ERROR: Invalid ObjectId format: ${customItem.itemId}`)
+          inventoryResults.push({
+            itemId: customItem.itemId,
+            status: 'invalid_id'
+          })
+          continue
+        }
+        
         const inventoryItem = await Inventory.findOne({
-          messId,
-          itemName: { $regex: new RegExp(`^${update.itemName}$`, 'i') },
-          unit: update.unit
+          _id: customItem.itemId
         })
+        
+        console.log(`DEBUG: Found inventory item:`, inventoryItem ? inventoryItem.itemName : 'NOT FOUND')
+        if (inventoryItem && inventoryItem.messId.toString() !== messId.toString()) {
+          console.log(`DEBUG: Item has different messId. Item messId: ${inventoryItem.messId}, Expected messId: ${messId}`)
+          console.log(`DEBUG: Updating item messId to match current user's mess`)
+          // Update the messId to match the current user's mess
+          inventoryItem.messId = messId
+        }
 
         if (inventoryItem) {
-          if (inventoryItem.quantity < update.quantityToDeduct) {
-            console.log(`WARNING: Insufficient ${update.itemName} in inventory. Available: ${inventoryItem.quantity}, Needed: ${update.quantityToDeduct}`)
+          const quantityToDeduct = parseFloat(customItem.quantityToDeduct)
+          console.log(`DEBUG: Processing ${inventoryItem.itemName}: current=${inventoryItem.quantity}, toDeduct=${quantityToDeduct}, type=${typeof quantityToDeduct}`)
+          
+          if (isNaN(quantityToDeduct) || quantityToDeduct <= 0) {
+            console.log(`ERROR: Invalid quantity to deduct: ${customItem.quantityToDeduct}`)
             inventoryResults.push({
-              item: update.itemName,
+              item: inventoryItem.itemName,
+              status: 'invalid_quantity',
+              provided: customItem.quantityToDeduct
+            })
+            continue
+          }
+          
+          if (inventoryItem.quantity < quantityToDeduct) {
+            console.log(`WARNING: Insufficient ${inventoryItem.itemName} in inventory. Available: ${inventoryItem.quantity}, Requested: ${quantityToDeduct}`)
+            inventoryResults.push({
+              item: inventoryItem.itemName,
               status: 'insufficient',
               available: inventoryItem.quantity,
-              needed: update.quantityToDeduct
+              requested: quantityToDeduct
             })
           } else {
+            const previousQuantity = inventoryItem.quantity
             // Deduct from inventory
-            inventoryItem.quantity -= update.quantityToDeduct
+            inventoryItem.quantity -= quantityToDeduct
             inventoryItem.lastUpdated = new Date()
             inventoryItem.updatedByUserId = userId
+            
+            console.log(`DEBUG: About to save inventory item. New quantity: ${inventoryItem.quantity}`)
             await inventoryItem.save()
+            console.log(`DEBUG: Successfully saved inventory item ${inventoryItem.itemName}`)
+            
+            // Log the inventory change
+            console.log(`DEBUG: About to log inventory change`)
+            await logInventoryChange({
+              messId,
+              inventoryItemId: inventoryItem._id.toString(),
+              itemName: inventoryItem.itemName,
+              action: 'DEDUCT',
+              previousQuantity,
+              newQuantity: inventoryItem.quantity,
+              unit: inventoryItem.unit,
+              category: inventoryItem.category,
+              reason: `Meal preparation: ${mealSlot} for ${totalMeals} meals (${standardMeals} standard, ${extraMeals} extra)`,
+              performedBy: userId
+            })
+            console.log(`DEBUG: Successfully logged inventory change`)
             
             inventoryResults.push({
-              item: update.itemName,
+              item: inventoryItem.itemName,
               status: 'deducted',
-              deducted: update.quantityToDeduct,
-              remaining: inventoryItem.quantity
+              deducted: quantityToDeduct,
+              remaining: inventoryItem.quantity,
+              unit: inventoryItem.unit
             })
             
-            console.log(`DEBUG: Deducted ${update.quantityToDeduct} ${update.unit} of ${update.itemName}. Remaining: ${inventoryItem.quantity}`)
+            console.log(`DEBUG: Deducted ${quantityToDeduct} ${inventoryItem.unit} of ${inventoryItem.itemName}. Remaining: ${inventoryItem.quantity}`)
           }
         } else {
-          console.log(`WARNING: ${update.itemName} not found in inventory`)
+          console.log(`WARNING: Inventory item with ID ${customItem.itemId} not found`)
           inventoryResults.push({
-            item: update.itemName,
+            itemId: customItem.itemId,
             status: 'not_found'
           })
         }
       } catch (error) {
-        console.error(`ERROR: Failed to update inventory for ${update.itemName}:`, error)
+        console.error(`ERROR: Failed to update inventory for item ${customItem.itemId}:`, error)
         inventoryResults.push({
-          item: update.itemName,
+          itemId: customItem.itemId,
           status: 'error',
           error: error instanceof Error ? error.message : 'Unknown error occurred'
         })
@@ -325,80 +348,118 @@ export async function DELETE(req: NextRequest) {
     const standardMeals = attendanceData.filter(a => !a.extraMealCount || a.extraMealCount === 0).length
     const extraMeals = attendanceData.reduce((sum, a) => sum + (a.extraMealCount || 0), 0)
     const totalMeals = standardMeals + extraMeals
-    console.log(`DEBUG: Restoring inventory for ${totalMeals} meals (${standardMeals} standard, ${extraMeals} extra)`)
+    console.log(`DEBUG: Current attendance shows ${totalMeals} meals (${standardMeals} standard, ${extraMeals} extra)`)
 
-    // Restore inventory items (add back what was deducted)
-    const inventoryUpdates = []
+    // Get the inventory deduction records for this meal preparation
+    // Look for any records matching the meal slot and date pattern
+    const deductionRecords = await InventoryRecord.find({
+      action: 'DEDUCT',
+      reason: { $regex: `Meal preparation: ${mealSlot}.*meals` },
+      timestamp: {
+        $gte: new Date(mealDate.getTime()),
+        $lt: new Date(mealDate.getTime() + 24 * 60 * 60 * 1000)
+      }
+    }).sort({ timestamp: -1 })
 
-    // Eggs
-    if (mealRoutine.eggPerPersonQty > 0) {
-      const totalEggs = mealRoutine.eggPerPersonQty * totalMeals
-      inventoryUpdates.push({
-        itemName: 'Eggs',
-        unit: 'pieces',
-        quantityToRestore: totalEggs
-      })
+    console.log(`DEBUG: Found ${deductionRecords.length} deduction records for ${mealSlot} on ${date}`)
+    
+    // If we found deduction records, extract the meal count from the reason
+    let originalTotalMeals = totalMeals
+    if (deductionRecords.length > 0) {
+      const reasonMatch = deductionRecords[0].reason.match(/for (\d+) meals/)
+      if (reasonMatch) {
+        originalTotalMeals = parseInt(reasonMatch[1])
+        console.log(`DEBUG: Extracted original meal count from deduction record: ${originalTotalMeals}`)
+      }
+    }
+    
+    console.log(`DEBUG: Restoring inventory for ${originalTotalMeals} meals (using original meal count from deduction records)`)
+
+    console.log(`DEBUG: Found ${deductionRecords.length} deduction records to restore`)
+
+    // Check if any of these deductions have already been restored
+    const restorationRecords = await InventoryRecord.find({
+      action: 'UPDATE',
+      reason: { $regex: `Meal undone restoration: ${mealSlot}` },
+      timestamp: {
+        $gte: new Date(mealDate.getTime()),
+        $lt: new Date(mealDate.getTime() + 24 * 60 * 60 * 1000)
+      }
+    })
+
+    // Filter out deduction records that have already been restored
+    const unrestoredDeductions = deductionRecords.filter(deductionRecord => {
+      return !restorationRecords.some(restorationRecord => 
+        restorationRecord.inventoryItemId.toString() === deductionRecord.inventoryItemId.toString() &&
+        restorationRecord.timestamp > deductionRecord.timestamp
+      )
+    })
+
+    console.log(`DEBUG: Found ${unrestoredDeductions.length} unrestored deduction records`)
+
+    if (unrestoredDeductions.length === 0) {
+      console.log('DEBUG: All deductions for this meal have already been restored')
     }
 
-    // Chicken pieces
-    if (mealRoutine.chickenPiecePerPersonQty > 0) {
-      const totalChickenPieces = mealRoutine.chickenPiecePerPersonQty * totalMeals
-      inventoryUpdates.push({
-        itemName: 'Chicken Pieces',
-        unit: 'pieces',
-        quantityToRestore: totalChickenPieces
-      })
-    }
-
-    // Fish pieces
-    if (mealRoutine.fishPiecePerPersonQty > 0) {
-      const totalFishPieces = mealRoutine.fishPiecePerPersonQty * totalMeals
-      inventoryUpdates.push({
-        itemName: 'Fish Pieces',
-        unit: 'pieces',
-        quantityToRestore: totalFishPieces
-      })
-    }
-
-    console.log(`DEBUG: Inventory updates needed for restoration:`, inventoryUpdates)
-
-    // Restore inventory items
+    // Restore inventory items based on the unrestored deduction records
     const inventoryResults = []
-    for (const update of inventoryUpdates) {
+    for (const record of unrestoredDeductions) {
       try {
-        // Find inventory item (case-insensitive search)
+        // Find inventory item by ID (without messId restriction since it might have changed)
         const inventoryItem = await Inventory.findOne({
-          messId,
-          itemName: { $regex: new RegExp(`^${update.itemName}$`, 'i') },
-          unit: update.unit
+          _id: record.inventoryItemId
         })
 
         if (inventoryItem) {
+          // Update messId to current user's mess if it's different
+          if (inventoryItem.messId.toString() !== messId.toString()) {
+            console.log(`DEBUG: Updating restoration item messId from ${inventoryItem.messId} to ${messId}`)
+            inventoryItem.messId = messId
+          }
+          
+          const quantityToRestore = record.previousQuantity - record.newQuantity // Amount that was deducted
+          const previousQuantity = inventoryItem.quantity
+          
           // Add back to inventory
-          inventoryItem.quantity += update.quantityToRestore
+          inventoryItem.quantity += quantityToRestore
           inventoryItem.lastUpdated = new Date()
           inventoryItem.updatedByUserId = userId
           await inventoryItem.save()
           
-          inventoryResults.push({
-            item: update.itemName,
-            status: 'restored',
-            restored: update.quantityToRestore,
-            newTotal: inventoryItem.quantity
+          // Log the restoration
+          await logInventoryChange({
+            messId,
+            inventoryItemId: inventoryItem._id.toString(),
+            itemName: inventoryItem.itemName,
+            action: 'UPDATE',
+            previousQuantity,
+            newQuantity: inventoryItem.quantity,
+            unit: inventoryItem.unit,
+            category: inventoryItem.category,
+            reason: `Meal undone restoration: ${mealSlot} - restored ${quantityToRestore} ${inventoryItem.unit}`,
+            performedBy: userId
           })
           
-          console.log(`DEBUG: Restored ${update.quantityToRestore} ${update.unit} of ${update.itemName}. New total: ${inventoryItem.quantity}`)
-        } else {
-          console.log(`WARNING: ${update.itemName} not found in inventory for restoration`)
           inventoryResults.push({
-            item: update.itemName,
+            item: inventoryItem.itemName,
+            status: 'restored',
+            restored: quantityToRestore,
+            newTotal: inventoryItem.quantity,
+            unit: inventoryItem.unit
+          })
+          
+          console.log(`DEBUG: Restored ${quantityToRestore} ${inventoryItem.unit} of ${inventoryItem.itemName}. New total: ${inventoryItem.quantity}`)
+        } else {
+          console.log(`WARNING: Inventory item with ID ${record.inventoryItemId} not found for restoration`)
+          inventoryResults.push({
+            item: record.itemName,
             status: 'not_found'
           })
         }
       } catch (error) {
-        console.error(`ERROR: Failed to restore inventory for ${update.itemName}:`, error)
+        console.error(`ERROR: Failed to restore inventory for ${record.itemName}:`, error)
         inventoryResults.push({
-          item: update.itemName,
+          item: record.itemName,
           status: 'error',
           error: error instanceof Error ? error.message : 'Unknown error'
         })
