@@ -17,6 +17,9 @@ const notificationSchema = new mongoose.Schema({
     enum: [
       'meal_off',
       'extra_meal',
+      'meal_attendance',
+      'meal_preparation',
+      'meal_routine',
       'low_inventory',
       'deposit_status',
       'dues_reminder',

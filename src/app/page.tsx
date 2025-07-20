@@ -2,12 +2,16 @@
 
 import AnimatedIcon from '@/components/ui/AnimatedIcon'
 import {
+    AccountBalance as AccountBalanceIcon,
+    Add as AddIcon,
     AdminPanelSettings as AdminIcon,
     BarChart as ChartIcon,
     CheckCircle as CheckCircleIcon,
     Group as GroupIcon,
     Home as HomeIcon,
+    Info as InfoIcon,
     Inventory as InventoryIcon,
+    Kitchen as KitchenIcon,
     AttachMoney as MoneyIcon,
     Notifications as NotificationsIcon,
     Person as PersonIcon,
@@ -108,6 +112,14 @@ export default function Home() {
     attendancePercentage: 0
   })
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const [recentActivities, setRecentActivities] = useState<Array<{
+    id: string
+    title: string
+    message: string
+    type: string
+    createdAt: string
+    isRead: boolean
+  }>>([])
   const [todayMeals, setTodayMeals] = useState<{
     breakfast: string | null
     lunch: string | null
@@ -138,6 +150,14 @@ export default function Home() {
         setFeatureLoading(false)
       }, 50)
     })
+    
+    // Refresh recent activities when switching back to dashboard
+    if (feature === null && user && user.mess) {
+      const token = localStorage.getItem('token')
+      if (token) {
+        fetchRecentActivities(token)
+      }
+    }
     
     // Scroll to top on mobile when switching features
     if (window.innerWidth < 640) {
@@ -170,6 +190,7 @@ export default function Home() {
             fetchDashboardStats(userData.user.mess.id, userData.user.id, token)
             fetchTodayMeals(token)
             fetchUnreadNotificationCount(token)
+            fetchRecentActivities(token)
           }
         } else {
           localStorage.removeItem('token')
@@ -213,6 +234,22 @@ export default function Home() {
     // Cleanup
     return () => window.removeEventListener('scroll', handleScroll)
   }, [lastScrollY])
+
+  // Periodic refresh for recent activities to show new notifications
+  useEffect(() => {
+    if (!user || !user.mess) return
+
+    const token = localStorage.getItem('token')
+    if (!token) return
+
+    // Refresh recent activities every 30 seconds
+    const interval = setInterval(() => {
+      fetchRecentActivities(token)
+    }, 30000) // 30 seconds
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval)
+  }, [user])
 
   const fetchDashboardStats = async (messId: string, userId: string, token: string) => {
     setStatsLoading(true)
@@ -260,7 +297,11 @@ export default function Home() {
     setMealsLoading(true)
     try {
       const today = new Date()
-      const todayStr = today.toISOString().split('T')[0]
+      // Format date without timezone issues
+      const year = today.getFullYear()
+      const month = String(today.getMonth() + 1).padStart(2, '0')
+      const day = String(today.getDate()).padStart(2, '0')
+      const todayStr = `${year}-${month}-${day}`
       
       const response = await fetch(`/api/meal-routine?startDate=${todayStr}&endDate=${todayStr}`, {
         headers: { 'Authorization': `Bearer ${token}` }
@@ -305,6 +346,70 @@ export default function Home() {
       }
     } catch (error) {
       setUnreadNotificationCount(0)
+    }
+  }
+
+  const fetchRecentActivities = async (token: string) => {
+    try {
+      const response = await fetch('/api/notifications?limit=3', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const activities = data.notifications || []
+        setRecentActivities(activities)
+      }
+    } catch (error) {
+      setRecentActivities([])
+    }
+  }
+
+  // Helper function to get icon and color for activity types
+  const getActivityIconAndColor = (type: string) => {
+    switch (type.toLowerCase()) {
+      case 'meal_attendance':
+        return { icon: <CheckCircleIcon />, color: 'text-green-600' }
+      case 'meal_routine':
+        return { icon: <RestaurantIcon />, color: 'text-blue-600' }
+      case 'meal_preparation':
+        return { icon: <KitchenIcon />, color: 'text-orange-600' }
+      case 'extra_meal':
+        return { icon: <AddIcon />, color: 'text-purple-600' }
+      case 'billing':
+        return { icon: <MoneyIcon />, color: 'text-indigo-600' }
+      case 'deposit':
+        return { icon: <AccountBalanceIcon />, color: 'text-teal-600' }
+      case 'expense':
+        return { icon: <ReceiptIcon />, color: 'text-red-600' }
+      case 'inventory':
+        return { icon: <InventoryIcon />, color: 'text-amber-600' }
+      case 'member':
+        return { icon: <GroupIcon />, color: 'text-cyan-600' }
+      case 'admin':
+        return { icon: <AdminIcon />, color: 'text-violet-600' }
+      default:
+        return { icon: <InfoIcon />, color: 'text-gray-600' }
+    }
+  }
+
+  // Helper function to format relative time
+  const formatRelativeTime = (dateString: string) => {
+    const now = new Date()
+    const date = new Date(dateString)
+    const diffInMs = now.getTime() - date.getTime()
+    const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60))
+    const diffInDays = Math.floor(diffInHours / 24)
+
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor(diffInMs / (1000 * 60))
+      return diffInMinutes < 1 ? 'Just now' : `${diffInMinutes} min ago`
+    } else if (diffInHours < 24) {
+      return `${diffInHours} hour${diffInHours > 1 ? 's' : ''} ago`
+    } else if (diffInDays < 7) {
+      return `${diffInDays} day${diffInDays > 1 ? 's' : ''} ago`
+    } else {
+      return date.toLocaleDateString()
     }
   }
 
@@ -763,24 +868,25 @@ export default function Home() {
               <div className="bg-white/70 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200/50 p-6">
                 <h3 className="text-lg font-semibold text-slate-800 mb-4">Recent Activity</h3>
                 <div className="space-y-3">
-                  <ActivityItem
-                    icon={<CheckCircleIcon />}
-                    title="Marked attendance for lunch"
-                    time="2 hours ago"
-                    color="text-green-600"
-                  />
-                  <ActivityItem
-                    icon={<RestaurantIcon />}
-                    title="Meal routine updated for tomorrow"
-                    time="5 hours ago"
-                    color="text-blue-600"
-                  />
-                  <ActivityItem
-                    icon={<MoneyIcon />}
-                    title="Monthly bill generated"
-                    time="1 day ago"
-                    color="text-purple-600"
-                  />
+                  {recentActivities.length > 0 ? (
+                    recentActivities.map((activity) => {
+                      const { icon, color } = getActivityIconAndColor(activity.type)
+                      return (
+                        <ActivityItem
+                          key={activity.id}
+                          icon={icon}
+                          title={activity.title}
+                          time={formatRelativeTime(activity.createdAt)}
+                          color={color}
+                        />
+                      )
+                    })
+                  ) : (
+                    <div className="text-center text-slate-500 py-4">
+                      <InfoIcon className="mx-auto mb-2 text-slate-400" />
+                      <p className="text-sm">No recent activity</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </>

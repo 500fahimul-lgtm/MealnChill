@@ -1,16 +1,16 @@
 'use client'
 
 import {
-    Add,
-    ChevronLeft,
-    ChevronRight,
-    Close,
-    DarkMode,
-    Edit,
-    RestaurantMenu,
-    Save,
-    WbSunny,
-    WbTwilight
+  Add,
+  ChevronLeft,
+  ChevronRight,
+  Close,
+  DarkMode,
+  Edit,
+  RestaurantMenu,
+  Save,
+  WbSunny,
+  WbTwilight
 } from '@mui/icons-material'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -52,19 +52,32 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
     start.setDate(start.getDate() - saturdayOffset)
     
     for (let i = 0; i < 7; i++) {
-      const date = new Date(start)
-      date.setDate(start.getDate() + i)
+      const date = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i)
       dates.push(date)
     }
     return dates
+  }
+
+  // Helper function to format date without timezone issues
+  const formatDateForAPI = (date: Date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
+  // Validation function to ensure meal routines match the correct date
+  const validateMealForDate = (meal: MealRoutineItem, date: Date) => {
+    const expectedDateStr = formatDateForAPI(date)
+    return meal.date === expectedDateStr
   }
 
   const fetchMealRoutines = useCallback(async () => {
     try {
       const token = localStorage.getItem('token')
       const weekDates = getWeekDates(currentWeek)
-      const startDate = weekDates[0].toISOString().split('T')[0]
-      const endDate = weekDates[6].toISOString().split('T')[0]
+      const startDate = formatDateForAPI(weekDates[0])
+      const endDate = formatDateForAPI(weekDates[6])
       
       const response = await fetch(`/api/meal-routine?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
@@ -74,7 +87,13 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
 
       if (response.ok) {
         const data = await response.json()
-        setMealRoutines(data.routines)
+        
+        // Validate that all received routines are within the expected date range
+        const validRoutines = data.routines.filter((routine: MealRoutineItem) => {
+          return routine.date >= startDate && routine.date <= endDate
+        })
+        
+        setMealRoutines(validRoutines)
       }
     } catch (error) {
       // Handle error silently
@@ -100,14 +119,21 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
   }
 
   const getMealForSlot = (date: Date, slot: string) => {
-    const dateStr = date.toISOString().split('T')[0]
-    return mealRoutines.find(meal => 
+    const dateStr = formatDateForAPI(date)
+    const meal = mealRoutines.find(meal => 
       meal.date === dateStr && meal.mealSlot === slot
     )
+    
+    // Double-check that the meal actually belongs to this date
+    if (meal && !validateMealForDate(meal, date)) {
+      return undefined
+    }
+    
+    return meal
   }
 
   const handleEditMeal = (date: Date, slot: string) => {
-    const dateStr = date.toISOString().split('T')[0]
+    const dateStr = formatDateForAPI(date)
     const existingMeal = getMealForSlot(date, slot)
     
     if (existingMeal) {

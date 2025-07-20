@@ -4,6 +4,7 @@ import Inventory from '@/models/Inventory'
 import InventoryRecord from '@/models/InventoryRecord'
 import MealAttendance from '@/models/MealAttendance'
 import MealRoutine from '@/models/MealRoutine'
+import Notification from '@/models/Notification'
 import User from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
@@ -255,6 +256,31 @@ export async function POST(req: NextRequest) {
     mealRoutine.isMealPrepared = true
     await mealRoutine.save()
 
+    // Create notification for meal served
+    try {
+      const notification = new Notification({
+        messId: messId,
+        type: 'meal_preparation',
+        title: `${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} Meal Served`,
+        message: `${mealRoutine.mealName} has been prepared and served for ${totalMeals} members (${standardMeals} standard + ${extraMeals} extra)`,
+        priority: 'medium',
+        relatedData: {
+          date,
+          mealSlot,
+          mealName: mealRoutine.mealName,
+          totalMeals,
+          standardMeals,
+          extraMeals,
+          inventoryUpdated: inventoryResults.length > 0
+        }
+      })
+      await notification.save()
+      console.log(`DEBUG: Notification created for meal served: ${mealSlot}`)
+    } catch (notificationError) {
+      console.error('ERROR: Failed to create notification for meal served:', notificationError)
+      // Don't fail the main operation if notification creation fails
+    }
+
     console.log(`DEBUG: Meal ${mealSlot} marked as prepared successfully`)
 
     return NextResponse.json({
@@ -469,6 +495,32 @@ export async function DELETE(req: NextRequest) {
     // Mark meal as not prepared
     mealRoutine.isMealPrepared = false
     await mealRoutine.save()
+
+    // Create notification for meal undone
+    try {
+      const notification = new Notification({
+        messId: messId,
+        type: 'meal_preparation',
+        title: `${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} Meal Undone`,
+        message: `${mealRoutine.mealName} serving has been cancelled. Inventory items have been restored.`,
+        priority: 'medium',
+        relatedData: {
+          date,
+          mealSlot,
+          mealName: mealRoutine.mealName,
+          totalMeals,
+          standardMeals,
+          extraMeals,
+          inventoryRestored: inventoryResults.length > 0,
+          restoredItems: inventoryResults.filter(item => item.status === 'restored').length
+        }
+      })
+      await notification.save()
+      console.log(`DEBUG: Notification created for meal undone: ${mealSlot}`)
+    } catch (notificationError) {
+      console.error('ERROR: Failed to create notification for meal undone:', notificationError)
+      // Don't fail the main operation if notification creation fails
+    }
 
     console.log(`DEBUG: Meal ${mealSlot} marked as undone successfully`)
 

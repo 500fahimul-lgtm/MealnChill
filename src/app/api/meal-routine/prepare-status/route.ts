@@ -1,5 +1,6 @@
 import connectDB from '@/lib/mongodb'
 import MealRoutine from '@/models/MealRoutine'
+import Notification from '@/models/Notification'
 import User from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
@@ -53,6 +54,33 @@ export async function POST(request: NextRequest) {
       // Update existing meal routine
       mealRoutine.isMealPrepared = isMealPrepared
       await mealRoutine.save()
+    }
+
+    // Create notification for meal preparation status change
+    try {
+      const statusText = isMealPrepared ? 'Served' : 'Undone'
+      const message = isMealPrepared 
+        ? `${mealRoutine.mealName} has been prepared and served`
+        : `${mealRoutine.mealName} serving has been cancelled`
+
+      const notification = new Notification({
+        messId: decoded.messId,
+        type: 'meal_preparation',
+        title: `${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} Meal ${statusText}`,
+        message: message,
+        priority: 'medium',
+        relatedData: {
+          date,
+          mealSlot,
+          mealName: mealRoutine.mealName,
+          isMealPrepared,
+          updatedViaQuickToggle: true
+        }
+      })
+      await notification.save()
+    } catch (notificationError) {
+      console.error('ERROR: Failed to create notification for meal preparation status:', notificationError)
+      // Don't fail the main operation if notification creation fails
     }
 
     return NextResponse.json({

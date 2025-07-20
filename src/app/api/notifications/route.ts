@@ -32,6 +32,8 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const filter = searchParams.get('filter') || 'all'
+    const limitParam = searchParams.get('limit')
+    const limit = limitParam ? parseInt(limitParam, 10) : 50
 
     // Build query for notifications
     const query: any = {
@@ -48,7 +50,7 @@ export async function GET(req: NextRequest) {
 
     const notifications = await Notification.find(query)
       .sort({ createdAt: -1 })
-      .limit(50) // Limit to latest 50 notifications
+      .limit(Math.min(limit, 100)) // Cap at 100 notifications for performance
 
     return NextResponse.json({
       notifications: notifications.map(notification => ({
