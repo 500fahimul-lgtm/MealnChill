@@ -78,6 +78,13 @@ interface InventoryDeductionItem {
   unit: string
 }
 
+interface InventoryUpdateItem {
+  status: 'restored' | 'deducted'
+  item: string
+  restored: number
+  unit: string
+}
+
 interface InventoryModal {
   isOpen: boolean
   mealSlot: string
@@ -621,9 +628,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       if (response.ok) {
         // Check if inventory items were restored from the response
         if (responseData.inventoryUpdates && responseData.inventoryUpdates.length > 0) {
-          const restoredItems = responseData.inventoryUpdates
-            .filter(update => update.status === 'restored')
-            .map(update => `${update.restored} ${update.unit} of ${update.item}`)
+          const restoredItems = (responseData.inventoryUpdates as InventoryUpdateItem[])
+            .filter((update: InventoryUpdateItem) => update.status === 'restored')
+            .map((update: InventoryUpdateItem) => `${update.restored} ${update.unit} of ${update.item}`)
             .join(', ')
           
           if (restoredItems) {
