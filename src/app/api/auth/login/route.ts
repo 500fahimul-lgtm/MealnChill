@@ -50,7 +50,8 @@ export async function POST(req: NextRequest) {
         userId: user._id,
         email: user.email,
         messId: user.messId,
-        role: user.role
+        role: user.role,
+        isAdmin: user.isAdmin || user.role === 'admin'
       },
       process.env.JWT_SECRET as string,
       { expiresIn: '7d' }

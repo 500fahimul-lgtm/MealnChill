@@ -1,6 +1,6 @@
 'use client'
 
-import { Group } from '@mui/icons-material'
+import { CheckCircle, Close, Group } from '@mui/icons-material'
 import { useEffect, useState } from 'react'
 
 interface MemberData {
@@ -19,6 +19,12 @@ interface SeeMembersProps {
   isAdmin: boolean
 }
 
+interface Toast {
+  id: number
+  message: string
+  type: 'success' | 'error' | 'info'
+}
+
 export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
   const [members, setMembers] = useState<MemberData[]>([])
   const [filteredMembers, setFilteredMembers] = useState<MemberData[]>([])
@@ -28,6 +34,23 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
   const [newMemberEmail, setNewMemberEmail] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [message, setMessage] = useState('')
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  // Toast functions
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    const id = Date.now()
+    const newToast: Toast = { id, message, type }
+    setToasts(prev => [...prev, newToast])
+
+    // Auto remove toast after 5 seconds
+    setTimeout(() => {
+      removeToast(id)
+    }, 5000)
+  }
+
+  const removeToast = (id: number) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id))
+  }
 
   const fetchMembers = async () => {
     try {
@@ -79,14 +102,15 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
       })
 
       if (response.ok) {
-        setMessage(`${memberName} has been removed from the mess`)
+        showToast(`${memberName} has been removed from the mess`, 'success')
+        setMessage('') // Clear old messages
         await fetchMembers()
       } else {
         const error = await response.json()
-        setMessage(error.message || 'Failed to remove member')
+        showToast(error.message || 'Failed to remove member', 'error')
       }
     } catch (error) {
-      setMessage('Network error. Please try again.')
+      showToast('Network error. Please try again.', 'error')
     } finally {
       setIsProcessing(false)
     }
@@ -111,16 +135,20 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
       })
 
       if (response.ok) {
-        setMessage('Member added successfully')
+        const data = await response.json()
+        // Extract member name from the success message or use email
+        const memberName = data.message.split(' has been successfully')[0] || newMemberEmail
+        showToast(`${memberName} added successfully!`, 'success')
+        setMessage('') // Clear old messages
         setNewMemberEmail('')
         setShowAddMember(false)
         await fetchMembers()
       } else {
         const error = await response.json()
-        setMessage(error.message || 'Failed to add member')
+        showToast(error.message || 'Failed to add member', 'error')
       }
     } catch (error) {
-      setMessage('Network error. Please try again.')
+      showToast('Network error. Please try again.', 'error')
     } finally {
       setIsProcessing(false)
     }
@@ -157,7 +185,8 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
 
       if (response.ok) {
         const data = await response.json()
-        setMessage(data.message)
+        showToast(data.message, 'success')
+        setMessage('') // Clear old messages
         await fetchMembers()
         
         // If transferring admin rights, reload the page to update permissions
@@ -166,10 +195,10 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
         }
       } else {
         const error = await response.json()
-        setMessage(error.message || `Failed to ${action} member`)
+        showToast(error.message || `Failed to ${action} member`, 'error')
       }
     } catch (error) {
-      setMessage('Network error. Please try again.')
+      showToast('Network error. Please try again.', 'error')
     } finally {
       setIsProcessing(false)
     }
@@ -224,7 +253,7 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
           placeholder="Search members by name, email, or phone..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+          className="input-base"
         />
       </div>
 
@@ -354,7 +383,7 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
                   type="email"
                   value={newMemberEmail}
                   onChange={(e) => setNewMemberEmail(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  className="input-base"
                   placeholder="Enter member's email"
                   required
                 />
@@ -386,6 +415,63 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
           </div>
         </div>
       )}
+
+      {/* Toast Notifications */}
+      <div className="fixed bottom-4 right-4 z-50 space-y-3 max-w-sm">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-500 transform hover:scale-105 ${
+              toast.type === 'success' ? 'border-l-4 border-green-500' :
+              toast.type === 'error' ? 'border-l-4 border-red-500' :
+              'border-l-4 border-blue-500'
+            }`}
+          >
+            <div className="p-4">
+              <div className="flex items-start">
+                <div className="flex-shrink-0">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    toast.type === 'success' ? 'bg-green-100' :
+                    toast.type === 'error' ? 'bg-red-100' :
+                    'bg-blue-100'
+                  }`}>
+                    {toast.type === 'success' && <CheckCircle className="text-green-600 text-lg" />}
+                    {toast.type === 'error' && <Close className="text-red-600 text-lg" />}
+                    {toast.type === 'info' && <Group className="text-blue-600 text-lg" />}
+                  </div>
+                </div>
+                <div className="ml-3 flex-1">
+                  <div className={`text-sm font-semibold mb-1 ${
+                    toast.type === 'success' ? 'text-green-800' :
+                    toast.type === 'error' ? 'text-red-800' :
+                    'text-blue-800'
+                  }`}>
+                    {toast.type === 'success' && 'Success'}
+                    {toast.type === 'error' && 'Error'}
+                    {toast.type === 'info' && 'Info'}
+                  </div>
+                  <div className="text-sm text-gray-700 leading-relaxed">
+                    {toast.message}
+                  </div>
+                </div>
+                <div className="ml-3 flex-shrink-0">
+                  <button
+                    className={`rounded-md p-1 inline-flex hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${
+                      toast.type === 'success' ? 'text-green-400 hover:text-green-500 focus:ring-green-500' :
+                      toast.type === 'error' ? 'text-red-400 hover:text-red-500 focus:ring-red-500' :
+                      'text-blue-400 hover:text-blue-500 focus:ring-blue-500'
+                    }`}
+                    onClick={() => removeToast(toast.id)}
+                  >
+                    <span className="sr-only">Close</span>
+                    <Close className="text-lg" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

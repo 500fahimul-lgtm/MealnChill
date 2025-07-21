@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
           phone: member.phone,
           totalMealsTaken: totalMealsTaken[0]?.totalMeals || 0,
           totalMoneyPaid: totalMoneyPaid[0]?.totalAmount || 0,
-          role: member.isAdmin ? 'Admin' : 'Member',
+          role: member.isAdmin ? 'admin' : 'member',
           joinedAt: member.joinedAt
         }
       })
