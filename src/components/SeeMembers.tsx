@@ -154,14 +154,12 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
     }
   }
 
-  const handleAdminAction = async (memberId: string, memberName: string, action: 'promote' | 'demote' | 'transfer') => {
+  const handleAdminAction = async (memberId: string, memberName: string, action: 'promote' | 'demote') => {
     let confirmMessage = ''
     if (action === 'promote') {
       confirmMessage = `Are you sure you want to promote ${memberName} to admin?`
     } else if (action === 'demote') {
       confirmMessage = `Are you sure you want to remove admin rights from ${memberName}?`
-    } else if (action === 'transfer') {
-      confirmMessage = `Are you sure you want to transfer admin rights to ${memberName}? You will lose admin privileges.`
     }
 
     if (!confirm(confirmMessage)) {
@@ -171,7 +169,7 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
     setIsProcessing(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/admin/transfer', {
+      const response = await fetch('/api/members/manage', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,11 +186,6 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
         showToast(data.message, 'success')
         setMessage('') // Clear old messages
         await fetchMembers()
-        
-        // If transferring admin rights, reload the page to update permissions
-        if (action === 'transfer') {
-          window.location.reload()
-        }
       } else {
         const error = await response.json()
         showToast(error.message || `Failed to ${action} member`, 'error')
@@ -332,14 +325,7 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
                               disabled={isProcessing}
                               className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 text-sm"
                             >
-                              Promote
-                            </button>
-                            <button
-                              onClick={() => handleAdminAction(member.id, member.name, 'transfer')}
-                              disabled={isProcessing}
-                              className="text-green-600 hover:text-green-900 disabled:text-gray-400 text-sm"
-                            >
-                              Transfer Admin
+                              Promote to Admin
                             </button>
                             <button
                               onClick={() => handleRemoveMember(member.id, member.name)}

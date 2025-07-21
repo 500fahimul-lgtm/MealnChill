@@ -104,10 +104,10 @@ export async function POST(req: NextRequest) {
 
     await mess.save()
 
-    // Update user's messId
+    // Update user's messId and set as regular member (not admin)
     await User.findByIdAndUpdate(userId, {
       messId: mess._id,
-      role: 'member'
+      isAdmin: false
     })
 
     // Generate new token with updated messId
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
         userId: userId,
         email: decoded.email,
         messId: mess._id.toString(),
-        role: 'member'
+        isAdmin: false
       },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }

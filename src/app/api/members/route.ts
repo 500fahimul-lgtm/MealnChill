@@ -115,9 +115,20 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 })
     }
 
-    // Cannot remove admin
+    // Cannot remove admin unless there are multiple admins
     if (user.isAdmin) {
-      return NextResponse.json({ message: 'Cannot remove admin user' }, { status: 400 })
+      // Check if there are other admins
+      const otherAdminCount = await User.countDocuments({ 
+        messId: decoded.messId, 
+        isAdmin: true, 
+        _id: { $ne: userId } 
+      })
+      
+      if (otherAdminCount === 0) {
+        return NextResponse.json({ 
+          message: 'Cannot remove the only admin. At least one admin must remain or promote another member first.' 
+        }, { status: 400 })
+      }
     }
 
     // Remove user from mess (set messId to null)

@@ -23,6 +23,8 @@ const notificationSchema = new mongoose.Schema({
       'low_inventory',
       'deposit_status',
       'dues_reminder',
+      'admin_promotion',
+      'admin_demotion',
       'general'
     ],
   },

@@ -68,6 +68,10 @@ const messSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  adminIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
   members: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,

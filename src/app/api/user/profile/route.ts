@@ -40,8 +40,8 @@ export async function GET(req: NextRequest) {
     if (user.messId) {
       const mess = await Mess.findById(user.messId)
       if (mess) {
-        // Check if user is admin
-        isAdmin = mess.adminId.toString() === userId
+        // Check if user is admin using the isAdmin field from user model
+        isAdmin = user.isAdmin || false
         
         // Check if user is an active member (in the members array)
         isMember = mess.members.some((member: any) => 

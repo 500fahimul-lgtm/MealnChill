@@ -42,8 +42,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       )
     }
 
-    // Check if user is admin
-    if (mess.adminId.toString() !== userId) {
+    // Check if user is admin using isAdmin field
+    if (!user.isAdmin) {
       return NextResponse.json(
         { message: 'Admin access required' },
         { status: 403 }
@@ -118,8 +118,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       )
     }
 
-    // Check if user is admin
-    if (mess.adminId.toString() !== userId) {
+    // Check if user is admin using isAdmin field
+    if (!user.isAdmin) {
       return NextResponse.json(
         { message: 'Admin access required' },
         { status: 403 }
