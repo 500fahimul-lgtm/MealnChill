@@ -6,7 +6,6 @@ import {
   Assignment,
   BarChart,
   Block,
-  Build,
   CheckCircle,
   Close,
   Email,
@@ -104,23 +103,23 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const [attendance, setAttendance] = useState<AttendanceData[]>([])
   const [mealSummary, setMealSummary] = useState<MealSummary[]>([])
   const [deadlineStatus, setDeadlineStatus] = useState<Record<string, DeadlineStatus>>({})
-  const [mealDeadlines, setMealDeadlines] = useState<{breakfast: string, lunch: string, dinner: string}>({
+  const [mealDeadlines, setMealDeadlines] = useState<{ breakfast: string, lunch: string, dinner: string }>({
     breakfast: '10:00',
-    lunch: '14:00', 
+    lunch: '14:00',
     dinner: '20:00'
   })
   const [isLoading, setIsLoading] = useState(true)
-  const [updatingStates, setUpdatingStates] = useState<{[key: string]: boolean}>({})
+  const [updatingStates, setUpdatingStates] = useState<{ [key: string]: boolean }>({})
   const [toasts, setToasts] = useState<ToastNotification[]>([])
   const [confirmationModal, setConfirmationModal] = useState<ConfirmationModal | null>(null)
   const [inventoryModal, setInventoryModal] = useState<InventoryModal | null>(null)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [selectedInventoryItems, setSelectedInventoryItems] = useState<InventoryDeductionItem[]>([])
-  
+
   // Local state for pending changes (not yet saved)
-  const [pendingChanges, setPendingChanges] = useState<{[key: string]: {isMealOn?: boolean, extraMealCount?: number}}>({})
-  const [savingStates, setSavingStates] = useState<{[key: string]: boolean}>({})
-  
+  const [pendingChanges, setPendingChanges] = useState<{ [key: string]: { isMealOn?: boolean, extraMealCount?: number } }>({})
+  const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
+
   // Always use current date
   const getCurrentDateStr = () => new Date().toISOString().split('T')[0]
 
@@ -129,9 +128,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     const now = new Date()
     const currentHour = now.getHours()
     const currentMinute = now.getMinutes()
-    
+
     let deadlineTimeStr: string
-    
+
     // Get deadline from mess settings
     switch (mealSlot) {
       case 'breakfast':
@@ -146,23 +145,23 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       default:
         deadlineTimeStr = mealDeadlines.dinner
     }
-    
+
     // Parse the deadline time (format: "HH:MM" or "HH:mm")
     const [deadlineHourStr, deadlineMinuteStr] = deadlineTimeStr.split(':')
     const deadlineHour = parseInt(deadlineHourStr, 10)
     const deadlineMinute = parseInt(deadlineMinuteStr, 10)
-    
+
     // Format deadline label (convert 24-hour to 12-hour format)
     const deadlineLabel = formatTimeToAMPM(deadlineHour, deadlineMinute)
-    
+
     // Calculate if deadline has passed
     const currentTime = currentHour * 60 + currentMinute
     const deadlineTime = deadlineHour * 60 + deadlineMinute
     const isPassed = currentTime > deadlineTime
-    
+
     // Admins can always modify, regular users can't modify after deadline
     const canModify = isAdmin || !isPassed
-    
+
     return {
       deadline: deadlineLabel,
       isPassed,
@@ -181,10 +180,10 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   // Update deadline status for all meal slots
   const updateDeadlineStatus = useCallback(() => {
     const newDeadlineStatus: Record<string, DeadlineStatus> = {}
-    const slots = mealFrequency === 3 
+    const slots = mealFrequency === 3
       ? [{ key: 'breakfast', name: 'Breakfast' }, { key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
       : [{ key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
-    
+
     slots.forEach(slot => {
       newDeadlineStatus[slot.key] = calculateDeadlineStatus(slot.key)
     })
@@ -203,7 +202,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
 
       if (response.ok) {
         const data = await response.json()
-        
+
         if (data.mess && data.mess.mealDeadlines) {
           const newDeadlines = {
             breakfast: data.mess.mealDeadlines.breakfast || '10:00',
@@ -223,14 +222,14 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   // Set up real-time deadline checking
   useEffect(() => {
     updateDeadlineStatus()
-    
+
     // Update deadline status every minute
     const deadlineInterval = setInterval(updateDeadlineStatus, 60000)
-    
+
     return () => clearInterval(deadlineInterval)
   }, [updateDeadlineStatus])
 
-  const mealSlots = mealFrequency === 3 
+  const mealSlots = mealFrequency === 3
     ? [{ key: 'breakfast', name: 'Breakfast' }, { key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
     : [{ key: 'lunch', name: 'Lunch' }, { key: 'dinner', name: 'Dinner' }]
 
@@ -239,7 +238,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       setIsLoading(true)
       const token = localStorage.getItem('token')
       const dateStr = getCurrentDateStr()
-      
+
       const response = await fetch(`/api/meal-attendance?date=${dateStr}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -250,7 +249,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         const data = await response.json()
         setAttendance(data.userAttendance)
         setMealSummary(data.mealSummary)
-        
+
         // Clear any pending changes when we get fresh data
         setPendingChanges({})
       } else {
@@ -288,7 +287,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       await fetchMessSettings() // Fetch mess settings first
       await fetchAttendanceData() // Then fetch attendance data
     }
-    
+
     initializeData()
   }, [fetchMessSettings, fetchAttendanceData])
 
@@ -296,7 +295,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const toggleMealStatus = (mealSlot: string, currentValue: boolean) => {
     const deadline = deadlineStatus[mealSlot]
     const summary = getSummaryForSlot(mealSlot)
-    
+
     // Check if meal has been prepared/performed
     if (summary?.isMealPrepared && !isAdmin) {
       showToast(
@@ -305,7 +304,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       )
       return
     }
-    
+
     if (!deadline?.canModify && !isAdmin) {
       showToast(
         `Cannot modify ${mealSlot} attendance after ${deadline?.deadline}. Contact admin if needed.`,
@@ -313,7 +312,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       )
       return
     }
-    
+
     const newValue = !currentValue
     setPendingChanges(prev => ({
       ...prev,
@@ -327,7 +326,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const updateExtraMealCount = (mealSlot: string, count: number) => {
     const deadline = deadlineStatus[mealSlot]
     const summary = getSummaryForSlot(mealSlot)
-    
+
     // Check if meal has been prepared/performed
     if (summary?.isMealPrepared && !isAdmin) {
       showToast(
@@ -336,7 +335,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       )
       return
     }
-    
+
     if (!deadline?.canModify && !isAdmin) {
       showToast(
         `Cannot modify ${mealSlot} extra meal after ${deadline?.deadline}. Contact admin if needed.`,
@@ -344,11 +343,11 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
       )
       return
     }
-    
+
     // Ensure count is within valid range
     const validCount = Math.max(0, Math.min(10, count))
-    
-    
+
+
     setPendingChanges(prev => ({
       ...prev,
       [mealSlot]: {
@@ -362,25 +361,25 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const saveAttendanceChanges = async (mealSlot: string) => {
     const changes = pendingChanges[mealSlot]
     if (!changes) {
-      
+
       return
     }
 
-    
+
     setSavingStates(prev => ({ ...prev, [mealSlot]: true }))
 
     try {
       const token = localStorage.getItem('token')
       const dateStr = getCurrentDateStr()
-      
+
       const requestData = {
         date: dateStr,
         mealSlot,
         ...changes
       }
-      
-      
-      
+
+
+
       const response = await fetch('/api/meal-attendance', {
         method: 'POST',
         headers: {
@@ -390,30 +389,30 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         body: JSON.stringify(requestData)
       })
 
-      
+
       const responseData = await response.json()
-      
+
 
       if (response.ok) {
-        
-        
+
+
         // Clear pending changes for this meal slot
         setPendingChanges(prev => {
           const newChanges = { ...prev }
           delete newChanges[mealSlot]
           return newChanges
         })
-        
+
         // Fetch latest data to get updated summary and sync state
-        
+
         await fetchAttendanceData()
-        
+
       } else {
-        
+
         console.error('Failed to save changes. Please try again.')
       }
     } catch (error) {
-      
+
       console.error('Error saving changes. Please try again.')
     } finally {
       setSavingStates(prev => ({ ...prev, [mealSlot]: false }))
@@ -459,7 +458,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     const id = Date.now().toString()
     const toast: ToastNotification = { id, message, type }
     setToasts(prev => [...prev, toast])
-    
+
     // Auto remove after 5 seconds
     setTimeout(() => {
       setToasts(prev => prev.filter(t => t.id !== id))
@@ -515,7 +514,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
 
   // Show preparation confirmation after inventory selection
   const showPreparationConfirmation = (mealSlot: string, inventoryItems: InventoryDeductionItem[]) => {
-    const itemsText = inventoryItems.length > 0 
+    const itemsText = inventoryItems.length > 0
       ? `\n\nInventory items to be deducted:\n${inventoryItems.map(item => `• ${item.quantityToDeduct} ${item.unit} of ${item.itemName}`).join('\n')}`
       : '\n\nNo inventory items will be deducted.'
 
@@ -539,7 +538,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     try {
       const token = localStorage.getItem('token')
       const dateStr = getCurrentDateStr()
-      
+
       const requestBody = {
         date: dateStr,
         mealSlot,
@@ -548,9 +547,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
           quantityToDeduct: item.quantityToDeduct
         }))
       }
-      
+
       console.log('DEBUG: Sending meal preparation request:', requestBody)
-      
+
       const response = await fetch('/api/meal-preparation', {
         method: 'POST',
         headers: {
@@ -575,7 +574,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         showToast(`Failed to mark meal as prepared: ${responseData.message || 'Unknown error'}`, 'error')
       }
     } catch (error) {
-      
+
       showToast('Error marking meal as prepared. Please try again.', 'error')
     } finally {
       setUpdatingStates(prev => ({ ...prev, [`${mealSlot}_preparing`]: false }))
@@ -610,7 +609,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     try {
       const token = localStorage.getItem('token')
       const dateStr = getCurrentDateStr()
-      
+
       const response = await fetch('/api/meal-preparation', {
         method: 'DELETE',
         headers: {
@@ -632,7 +631,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
             .filter((update: InventoryUpdateItem) => update.status === 'restored')
             .map((update: InventoryUpdateItem) => `${update.restored} ${update.unit} of ${update.item}`)
             .join(', ')
-          
+
           if (restoredItems) {
             showToast(`${mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)} marked as not served! Inventory items have been restored: ${restoredItems}`, 'success')
           } else {
@@ -647,7 +646,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         showToast(`Failed to mark meal as not served: ${responseData.message || 'Unknown error'}`, 'error')
       }
     } catch (error) {
-      
+
       showToast('Error marking meal as undone. Please try again.', 'error')
     } finally {
       setUpdatingStates(prev => ({ ...prev, [`${mealSlot}_undoing`]: false }))
@@ -679,10 +678,10 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
             <span className="font-semibold flex items-center">
               <Assignment className="mr-1" style={{ fontSize: '1rem' }} />
               Note:
-            </span> Meal attendance has deadlines - 
+            </span> Meal attendance has deadlines -
             {mealFrequency === 3 && `Breakfast: ${formatTimeToAMPM(parseInt(mealDeadlines.breakfast.split(':')[0]), parseInt(mealDeadlines.breakfast.split(':')[1]))}, `}
-            Lunch: {formatTimeToAMPM(parseInt(mealDeadlines.lunch.split(':')[0]), parseInt(mealDeadlines.lunch.split(':')[1]))}, 
-            Dinner: {formatTimeToAMPM(parseInt(mealDeadlines.dinner.split(':')[0]), parseInt(mealDeadlines.dinner.split(':')[1]))}. 
+            Lunch: {formatTimeToAMPM(parseInt(mealDeadlines.lunch.split(':')[0]), parseInt(mealDeadlines.lunch.split(':')[1]))},
+            Dinner: {formatTimeToAMPM(parseInt(mealDeadlines.dinner.split(':')[0]), parseInt(mealDeadlines.dinner.split(':')[1]))}.
             Once a meal is prepared and served by admin, attendance cannot be modified.
             {isAdmin ? (
               <span className="font-medium"> As an admin, you can modify attendance even after deadlines and meal preparation.</span>
@@ -706,14 +705,14 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
             const deadline = deadlineStatus[slot.key]
             const summary = getSummaryForSlot(slot.key)
             const isMealPrepared = summary?.isMealPrepared || false
-            
+
             return (
               <div key={slot.key} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
                 <div className="flex flex-col space-y-3 sm:flex-row sm:items-start sm:justify-between sm:space-y-0 mb-3">
                   <div className="flex flex-col space-y-1">
                     <h5 className="font-medium text-gray-900">{slot.name}</h5>
                     <p className="text-sm text-gray-600">{serverAttendance?.mealName || 'No meal planned'}</p>
-                    
+
                     {/* Meal Prepared Status */}
                     {isMealPrepared && (
                       <div className="text-xs font-medium text-blue-600">
@@ -723,14 +722,13 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                         </span>
                       </div>
                     )}
-                    
+
                     {/* Deadline Status */}
                     {deadline && !isMealPrepared && (
-                      <div className={`text-xs font-medium ${
-                        deadline.isPassed 
-                          ? 'text-red-600' 
+                      <div className={`text-xs font-medium ${deadline.isPassed
+                          ? 'text-red-600'
                           : 'text-green-600'
-                      }`}>
+                        }`}>
                         {deadline.isPassed ? (
                           <span className="flex items-center">
                             <Block className="mr-1" style={{ fontSize: '0.875rem' }} />
@@ -769,11 +767,10 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                         <button
                           onClick={() => saveAttendanceChanges(slot.key)}
                           disabled={isSaving}
-                          className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 shadow-sm w-full sm:w-auto ${
-                            isSaving 
-                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                          className={`px-3 py-2 text-sm font-medium rounded-md transition-all duration-200 shadow-sm w-full sm:w-auto ${isSaving
+                              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                               : 'bg-green-600 hover:bg-green-700 text-white hover:shadow-md transform hover:scale-105'
-                          }`}
+                            }`}
                         >
                           {isSaving ? (
                             <>
@@ -799,23 +796,19 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                     <button
                       onClick={() => toggleMealStatus(slot.key, isMealOn)}
                       disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin)}
-                      className={`relative inline-flex items-center h-6 rounded-full w-11 transition-all duration-200 transform flex-shrink-0 ${
-                        isMealOn ? 'bg-green-600' : 'bg-gray-400'
-                      } ${
-                        isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin)
-                          ? 'scale-95 opacity-50 cursor-not-allowed' 
+                      className={`relative inline-flex items-center h-6 rounded-full w-11 transition-all duration-200 transform flex-shrink-0 ${isMealOn ? 'bg-green-600' : 'bg-gray-400'
+                        } ${isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin)
+                          ? 'scale-95 opacity-50 cursor-not-allowed'
                           : 'hover:scale-105 active:scale-95'
-                      }`}
+                        }`}
                     >
                       <span
-                        className={`inline-block w-4 h-4 transform bg-white rounded-full transition-all duration-200 ${
-                          isMealOn ? 'translate-x-6' : 'translate-x-1'
-                        } ${isSaving ? 'animate-pulse' : ''}`}
+                        className={`inline-block w-4 h-4 transform bg-white rounded-full transition-all duration-200 ${isMealOn ? 'translate-x-6' : 'translate-x-1'
+                          } ${isSaving ? 'animate-pulse' : ''}`}
                       />
                     </button>
-                    <span className={`text-sm font-medium transition-colors duration-200 min-w-0 flex items-center ${
-                      isMealOn ? 'text-green-600' : 'text-gray-500'
-                    }`}>
+                    <span className={`text-sm font-medium transition-colors duration-200 min-w-0 flex items-center ${isMealOn ? 'text-green-600' : 'text-gray-500'
+                      }`}>
                       {isMealOn ? (
                         <>
                           <CheckCircle className="mr-1" style={{ fontSize: '1rem' }} />
@@ -860,9 +853,8 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                         +
                       </button>
                     </div>
-                    <span className={`text-sm font-medium transition-colors duration-200 min-w-0 flex items-center ${
-                      extraMealCount > 0 ? 'text-blue-600' : 'text-gray-500'
-                    }`}>
+                    <span className={`text-sm font-medium transition-colors duration-200 min-w-0 flex items-center ${extraMealCount > 0 ? 'text-blue-600' : 'text-gray-500'
+                      }`}>
                       {extraMealCount > 0 ? (
                         <>
                           <Restaurant className="mr-1" style={{ fontSize: '1rem' }} />
@@ -893,22 +885,19 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
           {mealSlots.map(slot => {
             const deadline = deadlineStatus[slot.key]
             return (
-              <div key={slot.key} className={`p-3 rounded-lg border-2 ${
-                deadline?.isPassed 
-                  ? 'bg-red-100 border-red-300' 
+              <div key={slot.key} className={`p-3 rounded-lg border-2 ${deadline?.isPassed
+                  ? 'bg-red-100 border-red-300'
                   : 'bg-green-100 border-green-300'
-              }`}>
+                }`}>
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-gray-900 text-sm">{slot.name}</span>
-                  <span className={`text-sm font-bold ${
-                    deadline?.isPassed ? 'text-red-600' : 'text-green-600'
-                  }`}>
+                  <span className={`text-sm font-bold ${deadline?.isPassed ? 'text-red-600' : 'text-green-600'
+                    }`}>
                     {deadline?.deadline}
                   </span>
                 </div>
-                <div className={`text-xs mt-1 font-medium ${
-                  deadline?.isPassed ? 'text-red-600' : 'text-green-600'
-                }`}>
+                <div className={`text-xs mt-1 font-medium ${deadline?.isPassed ? 'text-red-600' : 'text-green-600'
+                  }`}>
                   {deadline?.isPassed ? (
                     <span className="flex items-center">
                       <Block className="mr-1" style={{ fontSize: '0.75rem' }} />
@@ -959,7 +948,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                       <span className="text-gray-900 font-semibold">Total Meals:</span>
                       <span className="font-bold text-purple-600 text-xl">{summary.overallTotalMeals}</span>
                     </div>
-                    
+
                     {/* Meal Preparation Status & Admin Controls */}
                     <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:justify-between sm:space-y-0 pt-3 border-t border-blue-300">
                       {summary.isMealPrepared ? (
@@ -972,11 +961,10 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                             <button
                               onClick={() => markMealAsUndone(slot.key)}
                               disabled={updatingStates[`${slot.key}_undoing`]}
-                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                updatingStates[`${slot.key}_undoing`]
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${updatingStates[`${slot.key}_undoing`]
                                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                   : 'bg-orange-600 hover:bg-orange-700 text-white shadow-md hover:shadow-lg transform hover:scale-105'
-                              }`}
+                                }`}
                               title="Mark this meal as not served and restore inventory items."
                             >
                               {updatingStates[`${slot.key}_undoing`] ? (
@@ -1003,11 +991,10 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                             <button
                               onClick={() => markMealAsPrepared(slot.key)}
                               disabled={updatingStates[`${slot.key}_preparing`]}
-                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
-                                updatingStates[`${slot.key}_preparing`]
+                              className={`px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${updatingStates[`${slot.key}_preparing`]
                                   ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                                   : 'bg-green-600 hover:bg-green-700 text-white shadow-md hover:shadow-lg transform hover:scale-105'
-                              }`}
+                                }`}
                               title="Mark this meal as prepared and served. This will deduct inventory items."
                             >
                               {updatingStates[`${slot.key}_preparing`] ? (
@@ -1048,7 +1035,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
             <GpsFixed className="mr-2 text-purple-600" />
             Today's Total Meal Production
           </h4>
-          
+
           <div className="grid grid-cols-3 gap-4 text-center">
             <div>
               <div className="text-3xl font-bold text-green-600">
@@ -1069,56 +1056,41 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
               <div className="text-sm text-gray-600 font-medium">Grand Total</div>
             </div>
           </div>
-          
+
           <div className="pt-4 border-t border-purple-200 mt-4">
             <p className="text-sm text-gray-700 text-center">
               <strong className="flex items-center justify-center">
                 <Kitchen className="mr-1" />
                 Cook's Summary:
               </strong> Prepare <span className="font-bold text-purple-600 text-lg">
-              {mealSummary.reduce((total, summary) => total + summary.overallTotalMeals, 0)}</span> total meals today
+                {mealSummary.reduce((total, summary) => total + summary.overallTotalMeals, 0)}</span> total meals today
             </p>
           </div>
         </div>
       </div>
 
       {/* Debug Info */}
-      <div className="mt-6 p-4 bg-gray-100 border border-gray-300 rounded-lg">
-        <details>
-          <summary className="cursor-pointer font-medium text-gray-700 flex items-center">
-            <Build className="mr-1" />
-            Debug Information
-          </summary>
-          <div className="mt-2 text-xs">
-            <div><strong>Pending Changes:</strong> {JSON.stringify(pendingChanges)}</div>
-            <div><strong>Current Date:</strong> {getCurrentDateStr()}</div>
-            <div><strong>Attendance Count:</strong> {attendance.length}</div>
-            <div><strong>Summary Count:</strong> {mealSummary.length}</div>
-          </div>
-        </details>
-      </div>
+      {/* Debug information section removed */}
 
       {/* Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-50 space-y-3 max-w-md">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-500 transform hover:scale-105 ${
-              toast.type === 'success' ? 'border-l-4 border-green-500' :
-              toast.type === 'error' ? 'border-l-4 border-red-500' :
-              toast.type === 'warning' ? 'border-l-4 border-yellow-500' :
-              'border-l-4 border-blue-500'
-            }`}
+            className={`w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-500 transform hover:scale-105 ${toast.type === 'success' ? 'border-l-4 border-green-500' :
+                toast.type === 'error' ? 'border-l-4 border-red-500' :
+                  toast.type === 'warning' ? 'border-l-4 border-yellow-500' :
+                    'border-l-4 border-blue-500'
+              }`}
           >
             <div className="p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    toast.type === 'success' ? 'bg-green-100' :
-                    toast.type === 'error' ? 'bg-red-100' :
-                    toast.type === 'warning' ? 'bg-yellow-100' :
-                    'bg-blue-100'
-                  }`}>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-green-100' :
+                      toast.type === 'error' ? 'bg-red-100' :
+                        toast.type === 'warning' ? 'bg-yellow-100' :
+                          'bg-blue-100'
+                    }`}>
                     {toast.type === 'success' && <CheckCircle className="text-green-600 text-lg" />}
                     {toast.type === 'error' && <Close className="text-red-600 text-lg" />}
                     {toast.type === 'warning' && <Warning className="text-yellow-600 text-lg" />}
@@ -1126,12 +1098,11 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                   </div>
                 </div>
                 <div className="ml-3 flex-1">
-                  <div className={`text-sm font-semibold mb-1 ${
-                    toast.type === 'success' ? 'text-green-800' :
-                    toast.type === 'error' ? 'text-red-800' :
-                    toast.type === 'warning' ? 'text-yellow-800' :
-                    'text-blue-800'
-                  }`}>
+                  <div className={`text-sm font-semibold mb-1 ${toast.type === 'success' ? 'text-green-800' :
+                      toast.type === 'error' ? 'text-red-800' :
+                        toast.type === 'warning' ? 'text-yellow-800' :
+                          'text-blue-800'
+                    }`}>
                     {toast.type === 'success' && 'Success'}
                     {toast.type === 'error' && 'Error'}
                     {toast.type === 'warning' && 'Warning'}
@@ -1164,12 +1135,11 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                 </div>
                 <div className="ml-3 flex-shrink-0">
                   <button
-                    className={`rounded-md p-1 inline-flex hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${
-                      toast.type === 'success' ? 'text-green-400 hover:text-green-500 focus:ring-green-500' :
-                      toast.type === 'error' ? 'text-red-400 hover:text-red-500 focus:ring-red-500' :
-                      toast.type === 'warning' ? 'text-yellow-400 hover:text-yellow-500 focus:ring-yellow-500' :
-                      'text-blue-400 hover:text-blue-500 focus:ring-blue-500'
-                    }`}
+                    className={`rounded-md p-1 inline-flex hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${toast.type === 'success' ? 'text-green-400 hover:text-green-500 focus:ring-green-500' :
+                        toast.type === 'error' ? 'text-red-400 hover:text-red-500 focus:ring-red-500' :
+                          toast.type === 'warning' ? 'text-yellow-400 hover:text-yellow-500 focus:ring-yellow-500' :
+                            'text-blue-400 hover:text-blue-500 focus:ring-blue-500'
+                      }`}
                     onClick={() => removeToast(toast.id)}
                   >
                     <span className="sr-only">Close</span>
@@ -1187,17 +1157,16 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={confirmationModal.onCancel}></div>
-            
+
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            
+
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
-                  <div className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10 ${
-                    confirmationModal.type === 'danger' ? 'bg-red-100' : 
-                    confirmationModal.type === 'warning' ? 'bg-yellow-100' : 
-                    'bg-blue-100'
-                  }`}>
+                  <div className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10 ${confirmationModal.type === 'danger' ? 'bg-red-100' :
+                      confirmationModal.type === 'warning' ? 'bg-yellow-100' :
+                        'bg-blue-100'
+                    }`}>
                     {confirmationModal.type === 'danger' && <Warning className="text-red-600" />}
                     {confirmationModal.type === 'warning' && <Warning className="text-yellow-600" />}
                     {confirmationModal.type === 'info' && <Info className="text-blue-600" />}
@@ -1217,11 +1186,10 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
               <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                 <button
                   type="button"
-                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${
-                    confirmationModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' :
-                    confirmationModal.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' :
-                    'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
-                  }`}
+                  className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${confirmationModal.type === 'danger' ? 'bg-red-600 hover:bg-red-700 focus:ring-red-500' :
+                      confirmationModal.type === 'warning' ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500' :
+                        'bg-blue-600 hover:bg-blue-700 focus:ring-blue-500'
+                    }`}
                   onClick={confirmationModal.onConfirm}
                 >
                   {confirmationModal.confirmText || 'Confirm'}
@@ -1244,9 +1212,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={inventoryModal.onCancel}></div>
-            
+
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
-            
+
             <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
               <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
@@ -1267,7 +1235,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                         </p>
                       </div>
                     </div>
-                    
+
                     {/* Inventory Items List */}
                     <div className="max-h-96 overflow-y-auto">
                       {inventoryItems.length === 0 ? (
@@ -1281,11 +1249,10 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                             const selectedItem = selectedInventoryItems.find(si => si.itemId === item._id)
                             const isSelected = !!selectedItem
                             const quantityToDeduct = selectedItem?.quantityToDeduct || 0
-                            
+
                             return (
-                              <div key={item._id} className={`border-2 rounded-lg p-4 transition-all ${
-                                isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
-                              }`}>
+                              <div key={item._id} className={`border-2 rounded-lg p-4 transition-all ${isSelected ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-gray-50'
+                                }`}>
                                 <div className="flex items-start justify-between mb-3">
                                   <div className="flex-1">
                                     <h4 className="font-medium text-gray-900">{item.itemName}</h4>
@@ -1297,7 +1264,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                                   <button
                                     onClick={() => {
                                       if (isSelected) {
-                                        setSelectedInventoryItems(prev => 
+                                        setSelectedInventoryItems(prev =>
                                           prev.filter(si => si.itemId !== item._id)
                                         )
                                       } else {
@@ -1310,16 +1277,15 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                                         }])
                                       }
                                     }}
-                                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                                      isSelected 
-                                        ? 'bg-red-100 text-red-800 hover:bg-red-200' 
+                                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${isSelected
+                                        ? 'bg-red-100 text-red-800 hover:bg-red-200'
                                         : 'bg-blue-100 text-blue-800 hover:bg-blue-200'
-                                    }`}
+                                      }`}
                                   >
                                     {isSelected ? 'Remove' : 'Add'}
                                   </button>
                                 </div>
-                                
+
                                 {isSelected && (
                                   <div className="space-y-2">
                                     <div className="flex items-center space-x-2">
@@ -1334,9 +1300,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                                         value={quantityToDeduct}
                                         onChange={(e) => {
                                           const value = Math.max(0, Math.min(item.quantity, parseFloat(e.target.value) || 0))
-                                          setSelectedInventoryItems(prev => 
-                                            prev.map(si => 
-                                              si.itemId === item._id 
+                                          setSelectedInventoryItems(prev =>
+                                            prev.map(si =>
+                                              si.itemId === item._id
                                                 ? { ...si, quantityToDeduct: value }
                                                 : si
                                             )
@@ -1365,7 +1331,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                         </div>
                       )}
                     </div>
-                    
+
                     {/* Selected Items Summary */}
                     {selectedInventoryItems.length > 0 && (
                       <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
