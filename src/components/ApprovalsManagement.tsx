@@ -64,7 +64,7 @@ export default function ApprovalsManagement() {
   const fetchJoinRequests = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/members', {
+      const response = await fetch('/api/members?includeAll=true', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

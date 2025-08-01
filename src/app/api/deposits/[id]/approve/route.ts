@@ -62,9 +62,8 @@ async function handleDepositAction(
 
     const { action, rejectionReason } = await request.json() // action: 'approve' or 'reject'
     
-    // Await params in Next.js 15
-    const awaitedParams = await params
-    const depositId = awaitedParams.id
+    // Get the deposit ID from already resolved params
+    const depositId = params.id
 
     if (!['approve', 'reject'].includes(action)) {
       return NextResponse.json({ message: 'Invalid action' }, { status: 400 })

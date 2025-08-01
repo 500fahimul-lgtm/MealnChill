@@ -29,6 +29,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
     }
 
+    // Check if this is an admin request for approvals management
+    const { searchParams } = new URL(request.url)
+    const includeAll = searchParams.get('includeAll') === 'true'
+    
+    // Get current user to check admin status
+    const currentUser = await User.findById(decoded.userId)
+    const isAdminRequest = currentUser?.isAdmin && includeAll
+
     // Get the mess with populated member details
     const mess = await Mess.findById(decoded.messId)
       .populate({
@@ -50,7 +58,17 @@ export async function GET(request: NextRequest) {
     // Process members with their approval status and stats
     const membersWithStats = await Promise.all(
       messData.members
-        .filter((member: any) => member.userId) // Only check if userId exists, include all members (pending and approved)
+        .filter((member: any) => {
+          if (!member.userId) return false
+          
+          // For admin requests (approvals management), include all members
+          if (isAdminRequest) {
+            return true
+          }
+          
+          // For regular member requests, only show approved and active members
+          return member.isApproved === true && member.isActive !== false
+        })
         .map(async (member: any) => {
           const user = member.userId
           
