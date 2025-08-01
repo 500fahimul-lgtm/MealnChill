@@ -28,8 +28,10 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
     }
 
-    // Get all members of the mess
-    const members = await User.find({ messId: decoded.messId })
+    // Get all members of the mess who have messId set
+    const members = await User.find({ 
+      messId: decoded.messId
+    })
       .select('name email phone isAdmin joinedAt')
       .sort({ joinedAt: 1 })
       .lean()
@@ -83,9 +85,9 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       members: membersWithStats,
-      totalMembers: membersWithStats.length 
+      totalMembers: membersWithStats.length
     })
   } catch (error) {
     console.error('Error fetching members:', error)

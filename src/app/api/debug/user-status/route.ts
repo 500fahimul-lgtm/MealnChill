@@ -55,3 +55,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    await connectDB();
+    // Activate all users with a messId
+    const result = await User.updateMany(
+      { messId: { $ne: null } },
+      { $set: { isActive: true } }
+    );
+    return NextResponse.json({ message: 'All users with a messId are now active.', modifiedCount: result.modifiedCount });
+  } catch (error) {
+    return NextResponse.json({ message: 'Error activating users', error: error instanceof Error ? error.message : error }, { status: 500 });
+  }
+}

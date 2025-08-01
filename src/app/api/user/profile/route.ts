@@ -40,11 +40,16 @@ export async function GET(req: NextRequest) {
     if (user.messId) {
       const mess = await Mess.findById(user.messId)
       if (mess) {
-        // Check if user is admin
-        isAdmin = mess.adminId.toString() === userId
-        
+        // Check if user is admin (support both single and multiple admin fields)
+        let isAdmin = false;
+        if (mess.adminId && mess.adminId.toString() === userId) {
+          isAdmin = true;
+        }
+        if (Array.isArray(mess.adminIds) && mess.adminIds.some((id: any) => id.toString() === userId)) {
+          isAdmin = true;
+        }
         // Check if user is an active member (in the members array)
-        isMember = mess.members.some((member: any) => 
+        isMember = mess.members.some((member: any) =>
           member.userId.toString() === userId && member.isActive
         )
 

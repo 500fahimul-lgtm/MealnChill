@@ -50,7 +50,9 @@ export default function MessSetup() {
           {/* Tab Content */}
           <div className="p-8">
             {activeTab === 'join' ? (
-              <JoinMessForm />
+              <JoinMessForm setActiveTab={setActiveTab} />
+            ) : activeTab === 'waiting' ? (
+              <WaitingForApproval />
             ) : (
               <CreateMessForm />
             )}
@@ -61,7 +63,7 @@ export default function MessSetup() {
   )
 }
 
-function JoinMessForm() {
+function JoinMessForm({ setActiveTab }: { setActiveTab: (tab: string) => void }) {
   const [messCode, setMessCode] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
@@ -87,12 +89,18 @@ function JoinMessForm() {
       if (response.ok) {
         const data = await response.json()
         
-        // Update token if provided
-        if (data.token) {
-          localStorage.setItem('token', data.token)
+        if (data.waitingForApproval) {
+          // Show waiting for approval message
+          setActiveTab('waiting')
+          setError('')
+        } else {
+          // Update token if provided
+          if (data.token) {
+            localStorage.setItem('token', data.token)
+          }
+          
+          router.push('/') // Redirect to home page (which is now the dashboard)
         }
-        
-        router.push('/') // Redirect to home page (which is now the dashboard)
       } else {
         const data = await response.json()
         setError(data.message || 'Failed to join mess')
@@ -323,6 +331,80 @@ function CreateMessForm() {
           {isLoading ? 'Creating...' : 'Create Mess'}
         </button>
       </form>
+    </div>
+  )
+}
+
+function WaitingForApproval() {
+  const [isChecking, setIsChecking] = useState(false)
+  const router = useRouter()
+
+  const checkApprovalStatus = async () => {
+    setIsChecking(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/user/join-status', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.hasMessId && data.isActive) {
+          // User has been approved, redirect to dashboard
+          router.push('/')
+        } else if (!data.isPending) {
+          // Request was rejected, go back to join form
+          window.location.reload()
+        }
+      }
+    } catch (error) {
+      console.error('Error checking approval status:', error)
+    } finally {
+      setIsChecking(false)
+    }
+  }
+
+  useEffect(() => {
+    // Check status every 30 seconds
+    const interval = setInterval(checkApprovalStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  return (
+    <div className="text-center">
+      <div className="mb-6">
+        <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 className="text-2xl font-semibold text-gray-900 mb-2">Waiting for Approval</h2>
+        <p className="text-gray-600 mb-4">
+          Your join request has been sent to the mess admin. You'll be notified once your request is approved.
+        </p>
+        <p className="text-sm text-gray-500">
+          Please ask your admin or meal manager to approve your request.
+        </p>
+      </div>
+
+      <div className="space-y-4">
+        <button
+          onClick={checkApprovalStatus}
+          disabled={isChecking}
+          className="bg-primary-600 text-white py-2 px-6 rounded-lg font-medium hover:bg-primary-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+        >
+          {isChecking ? 'Checking...' : 'Check Status'}
+        </button>
+
+        <button
+          onClick={() => window.location.reload()}
+          className="block mx-auto text-primary-600 hover:text-primary-700 text-sm font-medium"
+        >
+          Try Different Mess Code
+        </button>
+      </div>
     </div>
   )
 }

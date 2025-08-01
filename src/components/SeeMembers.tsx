@@ -12,6 +12,8 @@ interface MemberData {
   totalMoneyPaid: number
   role: string
   joinedAt: string
+  isActive?: boolean
+  isPending?: boolean
 }
 
 interface SeeMembersProps {
@@ -25,6 +27,23 @@ interface Toast {
   type: 'success' | 'error' | 'info'
 }
 
+// Add a simple confirmation modal component
+function ConfirmModal({ open, title, message, onConfirm, onCancel, confirmText = 'Confirm', cancelText = 'Cancel', loading }: { open: boolean, title: string, message: string, onConfirm: () => void, onCancel: () => void, confirmText?: string, cancelText?: string, loading?: boolean }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+      <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
+        <h3 className="text-lg font-semibold mb-2">{title}</h3>
+        <p className="text-gray-700 mb-4">{message}</p>
+        <div className="flex justify-end space-x-3">
+          <button onClick={onCancel} className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50" disabled={loading}>{cancelText}</button>
+          <button onClick={onConfirm} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400" disabled={loading}>{loading ? 'Processing...' : confirmText}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
   const [members, setMembers] = useState<MemberData[]>([])
   const [filteredMembers, setFilteredMembers] = useState<MemberData[]>([])
@@ -35,6 +54,12 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
   const [isProcessing, setIsProcessing] = useState(false)
   const [message, setMessage] = useState('')
   const [toasts, setToasts] = useState<Toast[]>([])
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [adminCount, setAdminCount] = useState(0);
+  // For confirmation modal
+  const [confirmModal, setConfirmModal] = useState<{ open: boolean, action: null | 'promote' | 'demote', member: MemberData | null }>(
+    { open: false, action: null, member: null }
+  );
 
   // Toast functions
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -55,7 +80,10 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
   const fetchMembers = async () => {
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch('/api/members', {
+      
+      // If admin, fetch from mess endpoint to get pending members
+      const endpoint = isAdmin ? `/api/mess/${messId}` : '/api/members'
+      const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -63,8 +91,26 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
 
       if (response.ok) {
         const data = await response.json()
-        setMembers(data.members)
-        setFilteredMembers(data.members)
+        if (isAdmin && data.mess?.members) {
+          // Transform mess member data to match MemberData interface
+          const transformedMembers = data.mess.members.map((member: any) => ({
+            id: member.userId,
+            name: member.name,
+            email: member.email,
+            phone: member.phone,
+            totalMealsTaken: 0, // Would need additional API call for stats
+            totalMoneyPaid: 0,  // Would need additional API call for stats
+            role: member.role || (member.isActive ? 'member' : 'pending'),
+            joinedAt: member.joinedAt,
+            isActive: member.isActive,
+            isPending: member.isPending || !member.isActive
+          }))
+          setMembers(transformedMembers)
+          setFilteredMembers(transformedMembers)
+        } else {
+          setMembers(data.members)
+          setFilteredMembers(data.members)
+        }
       }
     } catch (error) {
       // Handle error silently
@@ -85,6 +131,24 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
     )
     setFilteredMembers(filtered)
   }, [searchQuery, members])
+
+  // Fetch current user profile to get userId
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch('/api/user/profile', { headers: { 'Authorization': `Bearer ${token}` } });
+      if (res.ok) {
+        const data = await res.json();
+        setCurrentUserId(data.user.id);
+      }
+    };
+    fetchProfile();
+  }, []);
+  // Count admins whenever members change
+  useEffect(() => {
+    setAdminCount(members.filter(m => m.role === 'admin').length);
+  }, [members]);
 
   const handleRemoveMember = async (memberId: string, memberName: string) => {
     if (!confirm(`Are you sure you want to remove ${memberName} from the mess?`)) {
@@ -108,6 +172,64 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
       } else {
         const error = await response.json()
         showToast(error.message || 'Failed to remove member', 'error')
+      }
+    } catch (error) {
+      showToast('Network error. Please try again.', 'error')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleApproveMember = async (memberId: string, memberName: string) => {
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/mess/${messId}/members/approve`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: memberId }),
+      })
+
+      if (response.ok) {
+        showToast(`${memberName} has been approved and added to the mess`, 'success')
+        await fetchMembers()
+      } else {
+        const error = await response.json()
+        showToast(error.message || 'Failed to approve member', 'error')
+      }
+    } catch (error) {
+      showToast('Network error. Please try again.', 'error')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleRejectMember = async (memberId: string, memberName: string) => {
+    if (!confirm(`Are you sure you want to reject ${memberName}'s join request?`)) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/mess/${messId}/members/reject`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ userId: memberId }),
+      })
+
+      if (response.ok) {
+        showToast(`${memberName}'s join request has been rejected`, 'success')
+        await fetchMembers()
+      } else {
+        const error = await response.json()
+        showToast(error.message || 'Failed to reject member', 'error')
       }
     } catch (error) {
       showToast('Network error. Please try again.', 'error')
@@ -154,55 +276,35 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
     }
   }
 
-  const handleAdminAction = async (memberId: string, memberName: string, action: 'promote' | 'demote' | 'transfer') => {
-    let confirmMessage = ''
-    if (action === 'promote') {
-      confirmMessage = `Are you sure you want to promote ${memberName} to admin?`
-    } else if (action === 'demote') {
-      confirmMessage = `Are you sure you want to remove admin rights from ${memberName}?`
-    } else if (action === 'transfer') {
-      confirmMessage = `Are you sure you want to transfer admin rights to ${memberName}? You will lose admin privileges.`
-    }
-
-    if (!confirm(confirmMessage)) {
-      return
-    }
-
-    setIsProcessing(true)
+  // Replace handleAdminAction to use modal
+  const handleAdminAction = async (memberId: string, memberName: string, action: 'promote' | 'demote') => {
+    setIsProcessing(true);
     try {
-      const token = localStorage.getItem('token')
+      const token = localStorage.getItem('token');
       const response = await fetch('/api/admin/transfer', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          targetUserId: memberId,
-          action: action
-        })
-      })
-
+        body: JSON.stringify({ targetUserId: memberId, action }),
+      });
       if (response.ok) {
-        const data = await response.json()
-        showToast(data.message, 'success')
-        setMessage('') // Clear old messages
-        await fetchMembers()
-        
-        // If transferring admin rights, reload the page to update permissions
-        if (action === 'transfer') {
-          window.location.reload()
-        }
+        const data = await response.json();
+        showToast(data.message, 'success');
+        setMessage('');
+        await fetchMembers();
       } else {
-        const error = await response.json()
-        showToast(error.message || `Failed to ${action} member`, 'error')
+        const error = await response.json();
+        showToast(error.message || `Failed to ${action} member`, 'error');
       }
     } catch (error) {
-      showToast('Network error. Please try again.', 'error')
+      showToast('Network error. Please try again.', 'error');
     } finally {
-      setIsProcessing(false)
+      setIsProcessing(false);
+      setConfirmModal({ open: false, action: null, member: null });
     }
-  }
+  };
 
   if (isLoading) {
     return (
@@ -298,71 +400,94 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredMembers.map((member) => (
-                <tr key={member.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{member.name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-gray-900">{member.phone}</div>
-                    <div className="text-sm text-gray-500">{member.email}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-blue-600">{member.totalMealsTaken}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-semibold text-green-600">৳{member.totalMoneyPaid}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      member.role === 'admin' 
-                        ? 'bg-amber-100 text-amber-800' 
-                        : 'bg-blue-100 text-blue-800'
-                    }`}>
-                      {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
-                    </span>
-                  </td>
-                  {isAdmin && (
+              {filteredMembers.map((member) => {
+                const isSelf = member.id === currentUserId;
+                const isMemberAdmin = member.role === 'admin';
+                const canDemote = isMemberAdmin && ((isSelf && adminCount > 1) || (!isSelf));
+                return (
+                  <tr key={member.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex space-x-2">
-                        {member.role !== 'admin' ? (
-                          <>
-                            <button
-                              onClick={() => handleAdminAction(member.id, member.name, 'promote')}
-                              disabled={isProcessing}
-                              className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 text-sm"
-                            >
-                              Promote
-                            </button>
-                            <button
-                              onClick={() => handleAdminAction(member.id, member.name, 'transfer')}
-                              disabled={isProcessing}
-                              className="text-green-600 hover:text-green-900 disabled:text-gray-400 text-sm"
-                            >
-                              Transfer Admin
-                            </button>
-                            <button
-                              onClick={() => handleRemoveMember(member.id, member.name)}
-                              disabled={isProcessing}
-                              className="text-red-600 hover:text-red-900 disabled:text-gray-400 text-sm"
-                            >
-                              Remove
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            onClick={() => handleAdminAction(member.id, member.name, 'demote')}
-                            disabled={isProcessing}
-                            className="text-orange-600 hover:text-orange-900 disabled:text-gray-400 text-sm"
-                          >
-                            Demote
-                          </button>
-                        )}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">{member.name}</div>
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{member.phone}</div>
+                      <div className="text-sm text-gray-500">{member.email}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-blue-600">{member.totalMealsTaken}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-semibold text-green-600">৳{member.totalMoneyPaid}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        member.isPending 
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : member.role === 'admin'
+                          ? 'bg-amber-100 text-amber-800'
+                          : 'bg-blue-100 text-blue-800'
+                        }`}>
+                        {member.isPending 
+                          ? 'Pending' 
+                          : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                      </span>
+                    </td>
+                    {isAdmin && (
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex space-x-2">
+                          {member.isPending ? (
+                            <>
+                              <button
+                                onClick={() => handleApproveMember(member.id, member.name)}
+                                disabled={isProcessing}
+                                className="text-green-600 hover:text-green-900 disabled:text-gray-400 text-sm font-medium"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleRejectMember(member.id, member.name)}
+                                disabled={isProcessing}
+                                className="text-red-600 hover:text-red-900 disabled:text-gray-400 text-sm font-medium"
+                              >
+                                Reject
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              {!isMemberAdmin ? (
+                                <button
+                                  onClick={() => setConfirmModal({ open: true, action: 'promote', member })}
+                                  disabled={isProcessing}
+                                  className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 text-sm"
+                                >
+                                  Promote to admin
+                                </button>
+                              ) : (
+                                canDemote && (
+                                  <button
+                                    onClick={() => setConfirmModal({ open: true, action: 'demote', member })}
+                                    disabled={isProcessing}
+                                    className="text-orange-600 hover:text-orange-900 disabled:text-gray-400 text-sm"
+                                  >
+                                    Demote to member
+                                  </button>
+                                )
+                              )}
+                              <button
+                                onClick={() => handleRemoveMember(member.id, member.name)}
+                                disabled={isProcessing}
+                                className="text-red-600 hover:text-red-900 disabled:text-gray-400 text-sm"
+                              >
+                                Remove
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -373,7 +498,7 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
             <h4 className="text-lg font-semibold mb-4">Add New Member</h4>
-            
+
             <form onSubmit={handleAddMember} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -416,36 +541,50 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
         </div>
       )}
 
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        open={confirmModal.open}
+        title={confirmModal.action === 'promote' ? 'Promote to Admin' : 'Demote to Member'}
+        message={confirmModal.action === 'promote'
+          ? `Are you sure you want to promote ${confirmModal.member?.name} to admin?`
+          : `Are you sure you want to remove admin rights from ${confirmModal.member?.name}?${confirmModal.member?.id === currentUserId ? ' You will lose admin privileges.' : ''}`}
+        onConfirm={() => {
+          if (confirmModal.member && confirmModal.action) {
+            handleAdminAction(confirmModal.member.id, confirmModal.member.name, confirmModal.action);
+          }
+        }}
+        onCancel={() => setConfirmModal({ open: false, action: null, member: null })}
+        confirmText={confirmModal.action === 'promote' ? 'Promote' : 'Demote'}
+        loading={isProcessing}
+      />
+
       {/* Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-50 space-y-3 max-w-sm">
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-500 transform hover:scale-105 ${
-              toast.type === 'success' ? 'border-l-4 border-green-500' :
+            className={`w-full bg-white shadow-xl rounded-xl pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transition-all duration-500 transform hover:scale-105 ${toast.type === 'success' ? 'border-l-4 border-green-500' :
               toast.type === 'error' ? 'border-l-4 border-red-500' :
-              'border-l-4 border-blue-500'
-            }`}
+                'border-l-4 border-blue-500'
+              }`}
           >
             <div className="p-4">
               <div className="flex items-start">
                 <div className="flex-shrink-0">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                    toast.type === 'success' ? 'bg-green-100' :
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center ${toast.type === 'success' ? 'bg-green-100' :
                     toast.type === 'error' ? 'bg-red-100' :
-                    'bg-blue-100'
-                  }`}>
+                      'bg-blue-100'
+                    }`}>
                     {toast.type === 'success' && <CheckCircle className="text-green-600 text-lg" />}
                     {toast.type === 'error' && <Close className="text-red-600 text-lg" />}
                     {toast.type === 'info' && <Group className="text-blue-600 text-lg" />}
                   </div>
                 </div>
                 <div className="ml-3 flex-1">
-                  <div className={`text-sm font-semibold mb-1 ${
-                    toast.type === 'success' ? 'text-green-800' :
+                  <div className={`text-sm font-semibold mb-1 ${toast.type === 'success' ? 'text-green-800' :
                     toast.type === 'error' ? 'text-red-800' :
-                    'text-blue-800'
-                  }`}>
+                      'text-blue-800'
+                    }`}>
                     {toast.type === 'success' && 'Success'}
                     {toast.type === 'error' && 'Error'}
                     {toast.type === 'info' && 'Info'}
@@ -456,11 +595,10 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
                 </div>
                 <div className="ml-3 flex-shrink-0">
                   <button
-                    className={`rounded-md p-1 inline-flex hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${
-                      toast.type === 'success' ? 'text-green-400 hover:text-green-500 focus:ring-green-500' :
+                    className={`rounded-md p-1 inline-flex hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 ${toast.type === 'success' ? 'text-green-400 hover:text-green-500 focus:ring-green-500' :
                       toast.type === 'error' ? 'text-red-400 hover:text-red-500 focus:ring-red-500' :
-                      'text-blue-400 hover:text-blue-500 focus:ring-blue-500'
-                    }`}
+                        'text-blue-400 hover:text-blue-500 focus:ring-blue-500'
+                      }`}
                     onClick={() => removeToast(toast.id)}
                   >
                     <span className="sr-only">Close</span>

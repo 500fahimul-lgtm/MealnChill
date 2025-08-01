@@ -32,7 +32,7 @@ const messSchema = new mongoose.Schema({
       type: String,
       default: '10:00',
       validate: {
-        validator: function(v: string) {
+        validator: function (v: string) {
           return /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v)
         },
         message: 'Breakfast deadline must be in HH:MM format'
@@ -42,7 +42,7 @@ const messSchema = new mongoose.Schema({
       type: String,
       default: '14:00',
       validate: {
-        validator: function(v: string) {
+        validator: function (v: string) {
           return /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v)
         },
         message: 'Lunch deadline must be in HH:MM format'
@@ -52,7 +52,7 @@ const messSchema = new mongoose.Schema({
       type: String,
       default: '20:00',
       validate: {
-        validator: function(v: string) {
+        validator: function (v: string) {
           return /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/.test(v)
         },
         message: 'Dinner deadline must be in HH:MM format'
@@ -68,6 +68,10 @@ const messSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  adminIds: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
   members: [{
     userId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -110,26 +114,40 @@ const messSchema = new mongoose.Schema({
 })
 
 // Generate unique mess code before saving
-messSchema.pre('save', async function(next) {
+messSchema.pre('save', async function (next) {
   if (!this.messCode) {
     let code: string
     let isUnique = false
-    
+
     while (!isUnique) {
       // Generate a 6-character alphanumeric code
       code = Math.random().toString(36).substring(2, 8).toUpperCase()
-      
+
       // Check if this code already exists
       const existingMess = await (this.constructor as any).findOne({ messCode: code })
       if (!existingMess) {
         isUnique = true
       }
     }
-    
+
     this.messCode = code!
   }
   next()
 })
+
+// Ensure adminIds always includes adminId before saving
+messSchema.pre('save', function (next) {
+  if (this.adminId) {
+    if (!Array.isArray(this.adminIds)) {
+      this.adminIds = [];
+    }
+    const adminIdStr = this.adminId.toString();
+    if (!this.adminIds.some((id: any) => id.toString() === adminIdStr)) {
+      this.adminIds.push(this.adminId);
+    }
+  }
+  next();
+});
 
 // Prevent re-compilation during development
 let Mess: mongoose.Model<any>

@@ -185,6 +185,24 @@ export default function Home() {
           const userData = await response.json()
           setUser(userData.user)
           
+          // Check if user is in a mess but pending approval
+          if (!userData.user.mess) {
+            // Check if user has pending join request
+            const joinStatusResponse = await fetch('/api/user/join-status', {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+              },
+            })
+            if (joinStatusResponse.ok) {
+              const joinStatus = await joinStatusResponse.json()
+              if (joinStatus.isPending) {
+                // Redirect to waiting page
+                router.push('/mess-setup')
+                return
+              }
+            }
+          }
+          
           // Fetch dashboard stats after user data is loaded
           if (userData.user.mess) {
             fetchDashboardStats(userData.user.mess.id, userData.user.id, token)

@@ -81,6 +81,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Remove user from mess members array
+    mess.members = mess.members.filter((member: any) => member.userId.toString() !== currentUserId)
+    await mess.save()
+
     // Remove user from mess
     await User.findByIdAndUpdate(currentUserId, { 
       messId: null, 

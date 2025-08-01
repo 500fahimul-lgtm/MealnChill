@@ -89,49 +89,81 @@ export async function POST(req: NextRequest) {
     )
 
     if (existingMember) {
-      return NextResponse.json(
-        { message: 'You are already a member of this mess' },
-        { status: 400 }
-      )
+      if (existingMember.isActive) {
+        return NextResponse.json(
+          { message: 'You are already a member of this mess' },
+          { status: 400 }
+        )
+      } else {
+        // Check if this is a recent pending request (within last 24 hours) or an old left member
+        const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+        const isRecentRequest = new Date(existingMember.joinedAt) > dayAgo
+        
+        if (isRecentRequest) {
+          return NextResponse.json(
+            { message: 'Your join request is already pending approval' },
+            { status: 400 }
+          )
+        } else {
+          // This is an old record from when user left, reactivate it as pending
+          existingMember.joinedAt = new Date()
+          existingMember.isActive = false // Keep as pending for admin approval
+          await mess.save()
+          
+          // Notify admin(s) about join request
+          const Notification = (await import('@/models/Notification')).default;
+          const adminIds = mess.adminIds && mess.adminIds.length > 0 ? mess.adminIds : [mess.adminId];
+          const notifications = adminIds.map((adminId: any) => ({
+            messId: mess._id,
+            recipientId: adminId,
+            type: 'join_request',
+            title: 'New Join Request',
+            message: `${user.name || user.email} has requested to rejoin your mess.`,
+            relatedData: { userId, userName: user.name || user.email },
+            priority: 'medium',
+          }));
+          await Notification.insertMany(notifications);
+
+          return NextResponse.json(
+            {
+              message: 'Join request sent. Waiting for admin approval.',
+              waitingForApproval: true
+            },
+            { status: 200 }
+          )
+        }
+      }
     }
 
-    // Add user to mess members
+    // Add user to mess members as pending (isActive: false)
     mess.members.push({
       userId: userId,
       joinedAt: new Date(),
-      isActive: true
+      isActive: false
     })
 
     await mess.save()
 
-    // Update user's messId
-    await User.findByIdAndUpdate(userId, {
-      messId: mess._id,
-      role: 'member'
-    })
+    // Optionally, do not update user's messId yet, or set a pendingMessId field if you want to track
 
-    // Generate new token with updated messId
-    const newToken = jwt.sign(
-      { 
-        userId: userId,
-        email: decoded.email,
-        messId: mess._id.toString(),
-        role: 'member'
-      },
-      process.env.JWT_SECRET!,
-      { expiresIn: '7d' }
-    )
+    // Notify admin(s) about join request
+    const Notification = (await import('@/models/Notification')).default;
+    const adminIds = mess.adminIds && mess.adminIds.length > 0 ? mess.adminIds : [mess.adminId];
+    const notifications = adminIds.map((adminId: any) => ({
+      messId: mess._id,
+      recipientId: adminId,
+      type: 'join_request',
+      title: 'New Join Request',
+      message: `${user.name || user.email} has requested to join your mess.`,
+      relatedData: { userId, userName: user.name || user.email },
+      priority: 'medium',
+    }));
+    await Notification.insertMany(notifications);
 
     return NextResponse.json(
-      { 
-        message: 'Successfully joined the mess',
-        mess: {
-          id: mess._id,
-          name: mess.name,
-          messCode: mess.messCode,
-          mealFrequency: mess.mealFrequency
-        },
-        token: newToken
+      {
+        message: 'Join request sent. Waiting for admin approval.',
+        waitingForApproval: true
       },
       { status: 200 }
     )

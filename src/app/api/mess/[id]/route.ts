@@ -43,7 +43,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     // Check if user is admin
-    if (mess.adminId.toString() !== userId) {
+    const isAdmin = mess.adminIds?.some((adminId: any) => adminId.toString() === userId) ||
+                   mess.adminId.toString() === userId
+
+    if (!isAdmin) {
       return NextResponse.json(
         { message: 'Admin access required' },
         { status: 403 }
@@ -64,7 +67,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         email: member.userId.email,
         phone: member.userId.phone,
         isActive: member.isActive,
-        joinedAt: member.joinedAt
+        joinedAt: member.joinedAt,
+        isPending: !member.isActive
       }))
     }
 
