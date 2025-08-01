@@ -1,6 +1,7 @@
 import connectDB from '@/lib/mongodb'
 import MealAttendance from '@/models/MealAttendance'
 import MealRoutine from '@/models/MealRoutine'
+import Mess from '@/models/Mess'
 import Notification from '@/models/Notification'
 import User from '@/models/User'
 import jwt from 'jsonwebtoken'
@@ -76,13 +77,8 @@ export async function GET(req: NextRequest) {
     
     // If targetUserId is provided, check if current user is admin
     if (targetUserId) {
-      const mess = user.messId
-      const currentUserMembership = mess.members.find((member: any) => 
-        member.userId.toString() === userId
-      )
-      const isAdmin = mess.adminId.toString() === userId || currentUserMembership?.role === 'admin'
-      
-      if (!isAdmin) {
+      const mess = await Mess.findById(user.messId)
+      if (!mess || !user.isAdmin) {
         return NextResponse.json(
           { message: 'Only admins can fetch other users data' },
           { status: 403 }
@@ -341,20 +337,20 @@ export async function POST(req: NextRequest) {
     // Determine target user ID (for admin override)
     let targetUserIdToUpdate = userId // Default to logged-in user
     
-    // Check if user is admin
-    const userMembership = mess.members.find((member: any) => 
-      member.userId.toString() === userId
-    )
-    const isAdmin = mess.adminId.toString() === userId || userMembership?.role === 'admin'
-    
-    // Handle admin override for specific user
-    if (targetUserId && targetUserId !== userId) {
-      if (!isAdmin) {
+    // Check if user is admin using the isAdmin field from User model
+    const currentUser = await User.findById(userId)
+    if (!currentUser || !currentUser.isAdmin) {
+      // If not admin and trying to modify another user's data
+      if (targetUserId && targetUserId !== userId) {
         return NextResponse.json(
           { message: 'Only admins can modify other users\' meal attendance' },
           { status: 403 }
         )
       }
+    }
+    
+    // Handle admin override for specific user
+    if (targetUserId && targetUserId !== userId) {
       
       // Verify target user is in the same mess
       const targetUserMembership = mess.members.find((member: any) => 
@@ -377,7 +373,7 @@ export async function POST(req: NextRequest) {
     const normalizedDate = new Date(attendanceDate.getFullYear(), attendanceDate.getMonth(), attendanceDate.getDate())
     
     // Only check deadline if not admin override and user is not admin
-    const shouldCheckDeadline = !isAdminOverride && !isAdmin && requestDate.getTime() >= new Date().setHours(0, 0, 0, 0)
+    const shouldCheckDeadline = !isAdminOverride && !currentUser?.isAdmin && requestDate.getTime() >= new Date().setHours(0, 0, 0, 0)
     
     // Check if meal has been marked as prepared/performed - this blocks all member changes
     const mealRoutine = await MealRoutine.findOne({
@@ -387,7 +383,7 @@ export async function POST(req: NextRequest) {
       isActive: true
     })
     
-    if (mealRoutine && mealRoutine.isMealPrepared && !isAdmin) {
+    if (mealRoutine && mealRoutine.isMealPrepared && !currentUser?.isAdmin) {
       return NextResponse.json(
         { 
           message: `Cannot modify ${mealSlot} attendance. This meal has already been prepared and served by admin. Contact admin if you need assistance.`,

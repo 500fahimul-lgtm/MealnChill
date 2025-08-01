@@ -44,14 +44,13 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Create JWT token with role information
+    // Create JWT token with admin status
     const token = jwt.sign(
       { 
         userId: user._id,
         email: user.email,
         messId: user.messId,
-        role: user.role,
-        isAdmin: user.isAdmin || user.role === 'admin'
+        isAdmin: user.isAdmin
       },
       process.env.JWT_SECRET as string,
       { expiresIn: '7d' }
@@ -64,7 +63,7 @@ export async function POST(req: NextRequest) {
       email: user.email,
       phone: user.phone,
       messId: user.messId,
-      role: user.role,
+      isAdmin: user.isAdmin,
     }
 
     return NextResponse.json(

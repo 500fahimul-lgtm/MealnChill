@@ -90,6 +90,7 @@ export async function POST(req: NextRequest) {
       mealFrequency,
       adminIsActive: adminIsActive ?? true,
       adminId: userId,
+      adminIds: [userId], // Initialize with the creator as admin
       members: adminIsActive ? [{
         userId: userId,
         joinedAt: new Date(),
@@ -119,22 +120,22 @@ export async function POST(req: NextRequest) {
     await newMess.save()
     console.log('Mess saved successfully with code:', newMess.messCode)
 
-    // Update user's messId, role, and isActive status
+    // Update user's messId, isAdmin, and isActive status
     console.log('Updating user with messId:', newMess._id)
     await User.findByIdAndUpdate(userId, {
       messId: newMess._id,
-      role: 'admin',
+      isAdmin: true, // Set as admin
       isActive: adminIsActive ?? true
     })
     console.log('User updated successfully')
 
-    // Generate new token with updated messId
+    // Generate new token with updated messId and admin status
     const newToken = jwt.sign(
       { 
         userId: userId,
         email: decoded.email,
         messId: newMess._id.toString(),
-        role: 'admin'
+        isAdmin: true
       },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }

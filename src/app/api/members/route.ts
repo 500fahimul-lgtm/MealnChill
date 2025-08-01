@@ -28,10 +28,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
     }
 
-    // Get all members of the mess who have messId set
-    const members = await User.find({ 
-      messId: decoded.messId
-    })
+    // Get all active members of the mess
+    const members = await User.find({ messId: decoded.messId, isActive: true })
       .select('name email phone isAdmin joinedAt')
       .sort({ joinedAt: 1 })
       .lean()

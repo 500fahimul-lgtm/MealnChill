@@ -38,9 +38,9 @@ export async function PUT(
       return NextResponse.json({ message: 'User not found or not in a mess' }, { status: 404 })
     }
 
-    // Check if user is admin by verifying against mess adminId
+    // Check if user is admin using the isAdmin field
     const mess = await Mess.findById(user.messId)
-    if (!mess || mess.adminId.toString() !== decoded.userId) {
+    if (!mess || !user.isAdmin) {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
