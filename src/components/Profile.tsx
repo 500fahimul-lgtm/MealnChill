@@ -19,6 +19,19 @@ interface UserProfile {
   joinedAt: string
 }
 
+interface LeaveRequest {
+  id: string
+  reason: string
+  status: 'pending' | 'approved' | 'rejected'
+  requestedAt: string
+  reviewedAt?: string
+  reviewedBy?: {
+    id: string
+    name: string
+  }
+  adminNote?: string
+}
+
 interface ProfileProps {}
 
 export default function Profile() {
@@ -38,6 +51,10 @@ export default function Profile() {
     confirm: false
   })
   const [passwordErrors, setPasswordErrors] = useState<string[]>([])
+  const [leaveRequest, setLeaveRequest] = useState<LeaveRequest | null>(null)
+  const [hasActiveRequest, setHasActiveRequest] = useState(false)
+  const [showLeaveForm, setShowLeaveForm] = useState(false)
+  const [leaveReason, setLeaveReason] = useState('')
   const router = useRouter()
 
   const fetchProfile = async () => {
@@ -59,6 +76,25 @@ export default function Profile() {
       setMessage('Network error. Please try again.')
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  const fetchLeaveRequestStatus = async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/user/leave-request-status', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setHasActiveRequest(data.hasActiveRequest)
+        setLeaveRequest(data.leaveRequest)
+      }
+    } catch (error) {
+      console.error('Error fetching leave request status:', error)
     }
   }
 
@@ -211,8 +247,75 @@ export default function Profile() {
     }
   }
 
+  const handleSubmitLeaveRequest = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!leaveReason.trim()) {
+      setMessage('Please provide a reason for leaving')
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/user/leave-mess', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ reason: leaveReason }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage(data.message)
+        setShowLeaveForm(false)
+        setLeaveReason('')
+        fetchLeaveRequestStatus() // Refresh leave request status
+      } else {
+        const error = await response.json()
+        setMessage(error.message || 'Failed to submit leave request')
+      }
+    } catch (error) {
+      setMessage('Network error. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleCancelLeaveRequest = async () => {
+    if (!confirm('Are you sure you want to cancel your leave request?')) {
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/user/leave-request-status', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage(data.message)
+        fetchLeaveRequestStatus() // Refresh leave request status
+      } else {
+        const error = await response.json()
+        setMessage(error.message || 'Failed to cancel leave request')
+      }
+    } catch (error) {
+      setMessage('Network error. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   useEffect(() => {
     fetchProfile()
+    fetchLeaveRequestStatus()
   }, [])
 
   if (isLoading) {
@@ -523,6 +626,69 @@ export default function Profile() {
       {profile.messName && (
         <div className="mt-8 pt-6 border-t border-gray-200">
           <h4 className="text-lg font-medium text-gray-900 mb-4">Mess Management</h4>
+          
+          {/* Show leave request status if user has one */}
+          {leaveRequest && (
+            <div className={`border rounded-lg p-4 mb-4 ${
+              leaveRequest.status === 'pending' ? 'bg-yellow-50 border-yellow-200' :
+              leaveRequest.status === 'approved' ? 'bg-green-50 border-green-200' :
+              'bg-red-50 border-red-200'
+            }`}>
+              <h5 className={`text-sm font-medium mb-2 ${
+                leaveRequest.status === 'pending' ? 'text-yellow-800' :
+                leaveRequest.status === 'approved' ? 'text-green-800' :
+                'text-red-800'
+              }`}>
+                Leave Request {leaveRequest.status.charAt(0).toUpperCase() + leaveRequest.status.slice(1)}
+              </h5>
+              <p className={`text-sm mb-1 ${
+                leaveRequest.status === 'pending' ? 'text-yellow-700' :
+                leaveRequest.status === 'approved' ? 'text-green-700' :
+                'text-red-700'
+              }`}>
+                <strong>Reason:</strong> {leaveRequest.reason}
+              </p>
+              <p className={`text-sm mb-1 ${
+                leaveRequest.status === 'pending' ? 'text-yellow-700' :
+                leaveRequest.status === 'approved' ? 'text-green-700' :
+                'text-red-700'
+              }`}>
+                <strong>Requested:</strong> {new Date(leaveRequest.requestedAt).toLocaleDateString()}
+              </p>
+              {leaveRequest.reviewedAt && leaveRequest.reviewedBy && (
+                <>
+                  <p className={`text-sm mb-1 ${
+                    leaveRequest.status === 'pending' ? 'text-yellow-700' :
+                    leaveRequest.status === 'approved' ? 'text-green-700' :
+                    'text-red-700'
+                  }`}>
+                    <strong>Reviewed by:</strong> {leaveRequest.reviewedBy.name} on {new Date(leaveRequest.reviewedAt).toLocaleDateString()}
+                  </p>
+                  {leaveRequest.adminNote && (
+                    <p className={`text-sm mb-2 ${
+                      leaveRequest.status === 'pending' ? 'text-yellow-700' :
+                      leaveRequest.status === 'approved' ? 'text-green-700' :
+                      'text-red-700'
+                    }`}>
+                      <strong>Admin Note:</strong> {leaveRequest.adminNote}
+                    </p>
+                  )}
+                </>
+              )}
+              {leaveRequest.status === 'pending' && (
+                <div className="mt-3">
+                  <button
+                    onClick={handleCancelLeaveRequest}
+                    disabled={isProcessing}
+                    className="bg-yellow-600 text-white px-3 py-2 rounded-lg hover:bg-yellow-700 disabled:bg-gray-400 transition-colors text-sm"
+                  >
+                    {isProcessing ? 'Cancelling...' : 'Cancel Request'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <div className="flex items-start">
               <div className="flex-shrink-0">
@@ -533,18 +699,79 @@ export default function Profile() {
                   Leave Mess
                 </h5>
                 <p className="text-sm text-red-700 mt-1">
-                  Permanently leave this mess. You will lose access to all mess data and need to join or create another mess.
-                  {profile.isAdmin && ' As an admin, you must ensure there is at least one other admin before leaving.'}
+                  {profile.isAdmin ? 
+                    'As an admin, you can leave immediately. Regular members need admin approval to leave the mess.' :
+                    'Submit a request to leave this mess. An admin will review your request.'
+                  }
                 </p>
-                <div className="mt-3">
-                  <button
-                    onClick={handleLeaveMess}
-                    disabled={isProcessing}
-                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
-                  >
-                    {isProcessing ? 'Processing...' : 'Leave Mess'}
-                  </button>
-                </div>
+                
+                {/* Show different UI based on user role and request status */}
+                {profile.isAdmin ? (
+                  // Admin can leave immediately
+                  <div className="mt-3">
+                    <button
+                      onClick={handleLeaveMess}
+                      disabled={isProcessing}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+                    >
+                      {isProcessing ? 'Processing...' : 'Leave Mess'}
+                    </button>
+                  </div>
+                ) : hasActiveRequest ? (
+                  // Regular member with pending request
+                  <div className="mt-3">
+                    <p className="text-sm text-red-600 italic">
+                      You have a pending leave request. Please wait for admin approval.
+                    </p>
+                  </div>
+                ) : showLeaveForm ? (
+                  // Show leave request form
+                  <form onSubmit={handleSubmitLeaveRequest} className="mt-3">
+                    <div className="mb-3">
+                      <label className="block text-sm font-medium text-red-800 mb-1">
+                        Reason for leaving
+                      </label>
+                      <textarea
+                        value={leaveReason}
+                        onChange={(e) => setLeaveReason(e.target.value)}
+                        placeholder="Please provide a reason for leaving the mess..."
+                        required
+                        className="universal-input"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="submit"
+                        disabled={isProcessing || !leaveReason.trim()}
+                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+                      >
+                        {isProcessing ? 'Submitting...' : 'Submit Request'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowLeaveForm(false)
+                          setLeaveReason('')
+                        }}
+                        className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                ) : (
+                  // Show request leave button for regular members
+                  <div className="mt-3">
+                    <button
+                      onClick={() => setShowLeaveForm(true)}
+                      disabled={isProcessing}
+                      className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+                    >
+                      Request to Leave
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>

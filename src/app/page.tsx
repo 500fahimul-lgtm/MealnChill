@@ -2,22 +2,23 @@
 
 import AnimatedIcon from '@/components/ui/AnimatedIcon'
 import {
-    AccountBalance as AccountBalanceIcon,
-    Add as AddIcon,
-    AdminPanelSettings as AdminIcon,
-    BarChart as ChartIcon,
-    CheckCircle as CheckCircleIcon,
-    Group as GroupIcon,
-    Home as HomeIcon,
-    Info as InfoIcon,
-    Inventory as InventoryIcon,
-    Kitchen as KitchenIcon,
-    AttachMoney as MoneyIcon,
-    Notifications as NotificationsIcon,
-    Person as PersonIcon,
-    Receipt as ReceiptIcon,
-    Restaurant as RestaurantIcon,
-    Settings as SettingsIcon
+  AccountBalance as AccountBalanceIcon,
+  Add as AddIcon,
+  AdminPanelSettings as AdminIcon,
+  Approval as ApprovalIcon,
+  BarChart as ChartIcon,
+  CheckCircle as CheckCircleIcon,
+  Group as GroupIcon,
+  Home as HomeIcon,
+  Info as InfoIcon,
+  Inventory as InventoryIcon,
+  Kitchen as KitchenIcon,
+  AttachMoney as MoneyIcon,
+  Notifications as NotificationsIcon,
+  Person as PersonIcon,
+  Receipt as ReceiptIcon,
+  Restaurant as RestaurantIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material'
 import { CircularProgress } from '@mui/material'
 import dynamic from 'next/dynamic'
@@ -65,6 +66,10 @@ const CostSheet = dynamic(() => import('@/components/CostSheet'), {
 })
 const MessSettings = dynamic(() => import('@/components/MessSettings'), {
   loading: () => <ComponentLoader text="Loading Settings..." />,
+  ssr: false
+})
+const ApprovalsManagement = dynamic(() => import('@/components/ApprovalsManagement'), {
+  loading: () => <ComponentLoader text="Loading Approvals..." />,
   ssr: false
 })
 
@@ -604,6 +609,9 @@ export default function Home() {
                 isAdmin={user.mess.isAdmin}
               />
             )}
+            {activeFeature === 'approvals' && user.mess.isAdmin && (
+              <ApprovalsManagement />
+            )}
             {activeFeature === 'mess-settings' && user.mess.isAdmin && (
               <MessSettings 
                 messId={user.mess.id}
@@ -877,6 +885,9 @@ export default function Home() {
                   <AdminTool icon={<GroupIcon />} title="Members" onClick={() => handleFeatureChange('see-members')} isAdmin={user.mess.isAdmin} />
                   <AdminTool icon={<ChartIcon />} title="Cost Records" onClick={() => handleFeatureChange('cost-sheet')} isAdmin={user.mess.isAdmin} />
                   {user.mess.isAdmin && (
+                    <AdminTool icon={<ApprovalIcon />} title="Approvals" onClick={() => handleFeatureChange('approvals')} isAdmin={user.mess.isAdmin} />
+                  )}
+                  {user.mess.isAdmin && (
                     <AdminTool icon={<SettingsIcon />} title="Settings" onClick={() => handleFeatureChange('mess-settings')} isAdmin={user.mess.isAdmin} />
                   )}
                 </div>
@@ -981,6 +992,9 @@ export default function Home() {
                 isAdmin={user.mess.isAdmin}
               />
             )}
+            {activeFeature === 'approvals' && user.mess.isAdmin && (
+              <ApprovalsManagement />
+            )}
             {activeFeature === 'mess-settings' && user.mess.isAdmin && (
               <MessSettings 
                 messId={user.mess.id}
@@ -989,6 +1003,21 @@ export default function Home() {
             )}
             
             {/* Show access denied message for non-admin users trying to access admin-only features */}
+            {activeFeature === 'approvals' && !user.mess.isAdmin && (
+              <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 text-center">
+                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <ApprovalIcon sx={{ fontSize: 32, color: '#64748b' }} />
+                </div>
+                <h3 className="text-xl font-semibold text-slate-800 mb-2">Admin Access Required</h3>
+                <p className="text-slate-600 mb-4">You need admin privileges to manage approvals.</p>
+                <button 
+                  onClick={() => setActiveFeature(null)}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Back to Dashboard
+                </button>
+              </div>
+            )}
             {activeFeature === 'mess-settings' && !user.mess.isAdmin && (
               <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 text-center">
                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">

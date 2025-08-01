@@ -1,4 +1,5 @@
 import connectDB from '@/lib/mongodb'
+import LeaveRequest from '@/models/LeaveRequest'
 import Mess from '@/models/Mess'
 import Notification from '@/models/Notification'
 import User from '@/models/User'
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const currentUserId = decoded.userId
+    const { reason } = await request.json()
 
     // Get current user to check their actual mess status
     const currentUser = await User.findById(currentUserId)
@@ -46,7 +48,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ message: 'Mess not found' }, { status: 404 })
     }
 
-    // Check if user is admin
+    // Check if user is admin - admins can leave immediately if there are other admins
     if (currentUser.isAdmin) {
       // Check if there are other admins
       const totalAdmins = await User.countDocuments({ 
@@ -60,25 +62,87 @@ export async function POST(request: NextRequest) {
         }, { status: 400 })
       }
 
-      // If leaving admin was the main admin, assign it to another admin
-      if (mess.adminId && mess.adminId.toString() === currentUserId) {
-        const anotherAdmin = await User.findOne({
-          messId: currentUser.messId,
-          isAdmin: true,
-          _id: { $ne: currentUserId }
-        })
+      // Admin can leave immediately if there are other admins
+      return await processImmediateLeave(currentUser, mess, currentUserId)
+    }
 
-        if (anotherAdmin) {
-          mess.adminId = anotherAdmin._id
-          await mess.save()
+    // For regular members, check if there's already a pending request
+    const existingRequest = await LeaveRequest.findOne({
+      userId: currentUserId,
+      messId: currentUser.messId,
+      status: 'pending'
+    })
+
+    if (existingRequest) {
+      return NextResponse.json({ 
+        message: 'You already have a pending leave request. Please wait for admin approval.' 
+      }, { status: 400 })
+    }
+
+    // Create new leave request
+    const leaveRequest = new LeaveRequest({
+      userId: currentUserId,
+      messId: currentUser.messId,
+      reason: reason?.trim() || '',
+      status: 'pending'
+    })
+
+    await leaveRequest.save()
+
+    // Notify all admins about the leave request
+    const admins = await User.find({
+      messId: currentUser.messId,
+      isAdmin: true
+    })
+
+    for (const admin of admins) {
+      await Notification.create({
+        messId: currentUser.messId,
+        userId: admin._id,
+        type: 'leave_request',
+        title: 'Leave Request Submitted',
+        message: `${currentUser.name} has requested to leave the mess.${reason ? ` Reason: ${reason}` : ''}`,
+        isRead: false,
+        relatedData: {
+          leaveRequestId: leaveRequest._id,
+          requestingUserId: currentUserId,
+          requestingUserName: currentUser.name
         }
-      }
+      })
+    }
 
-      // Remove from adminIds array if it exists
-      if (Array.isArray(mess.adminIds)) {
-        mess.adminIds = mess.adminIds.filter((id: any) => id.toString() !== currentUserId)
+    return NextResponse.json({
+      message: 'Leave request submitted successfully. Please wait for admin approval.',
+      requestId: leaveRequest._id
+    })
+
+  } catch (error) {
+    console.error('Error creating leave request:', error)
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+  }
+}
+
+// Helper function for immediate leave (for admins)
+async function processImmediateLeave(currentUser: any, mess: any, currentUserId: string) {
+  try {
+    // If leaving admin was the main admin, assign it to another admin
+    if (mess.adminId && mess.adminId.toString() === currentUserId) {
+      const anotherAdmin = await User.findOne({
+        messId: currentUser.messId,
+        isAdmin: true,
+        _id: { $ne: currentUserId }
+      })
+
+      if (anotherAdmin) {
+        mess.adminId = anotherAdmin._id
         await mess.save()
       }
+    }
+
+    // Remove from adminIds array if it exists
+    if (Array.isArray(mess.adminIds)) {
+      mess.adminIds = mess.adminIds.filter((id: any) => id.toString() !== currentUserId)
+      await mess.save()
     }
 
     // Remove user from mess members array
@@ -102,8 +166,8 @@ export async function POST(request: NextRequest) {
         messId: currentUser.messId,
         userId: admin._id,
         type: 'member_left',
-        title: 'Member Left Mess',
-        message: `${currentUser.name} has left the mess.`,
+        title: 'Admin Left Mess',
+        message: `${currentUser.name} (Admin) has left the mess.`,
         isRead: false
       })
     }
@@ -114,7 +178,7 @@ export async function POST(request: NextRequest) {
         userId: currentUser._id,
         email: currentUser.email,
         messId: null,
-        role: 'member'
+        isAdmin: false
       },
       process.env.JWT_SECRET!,
       { expiresIn: '7d' }
@@ -126,7 +190,7 @@ export async function POST(request: NextRequest) {
     })
 
   } catch (error) {
-    console.error('Error leaving mess:', error)
-    return NextResponse.json({ message: 'Internal server error' }, { status: 500 })
+    console.error('Error processing immediate leave:', error)
+    throw error
   }
 }

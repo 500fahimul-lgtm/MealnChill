@@ -36,42 +36,30 @@ async function handleDepositAction(
   { params }: { params: { id: string } }
 ) {
   try {
-    console.log('APPROVE DEBUG: Starting handleDepositAction')
     await connectDB()
 
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
-      console.log('APPROVE DEBUG: No token provided')
       return NextResponse.json({ message: 'No token provided' }, { status: 401 })
     }
 
     const decoded = await verifyToken(token)
-    console.log('APPROVE DEBUG: Decoded token:', decoded)
     if (!decoded || !decoded.userId) {
-      console.log('APPROVE DEBUG: Invalid token')
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 
     // Get the user to find their mess
-    console.log('APPROVE DEBUG: Getting user with ID:', decoded.userId)
     const user = await User.findById(decoded.userId)
-    console.log('APPROVE DEBUG: User found:', user ? { id: user._id, messId: user.messId } : 'null')
     if (!user || !user.messId) {
-      console.log('APPROVE DEBUG: User not found or not in a mess')
       return NextResponse.json({ message: 'User not found or not in a mess' }, { status: 404 })
     }
 
     // Check if user is admin using the isAdmin field
-    console.log('APPROVE DEBUG: Getting mess with ID:', user.messId)
     const mess = await Mess.findById(user.messId)
-    console.log('APPROVE DEBUG: Mess found:', mess ? { id: mess._id } : 'null')
-    console.log('APPROVE DEBUG: Checking if user is admin - user.isAdmin:', user.isAdmin, 'decoded.userId:', decoded.userId)
     if (!mess || !user.isAdmin) {
-      console.log('APPROVE DEBUG: User is not admin')
       return NextResponse.json({ message: 'Unauthorized - Admin access required' }, { status: 403 })
     }
 
-    console.log('APPROVE DEBUG: User is admin, proceeding with action')
     const { action, rejectionReason } = await request.json() // action: 'approve' or 'reject'
     
     // Await params in Next.js 15

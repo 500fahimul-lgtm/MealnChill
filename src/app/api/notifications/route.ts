@@ -1,4 +1,5 @@
 import connectDB from '@/lib/mongodb'
+import Mess from '@/models/Mess'
 import Notification from '@/models/Notification'
 import User from '@/models/User'
 import jwt from 'jsonwebtoken'
@@ -22,10 +23,18 @@ export async function GET(req: NextRequest) {
     const userId = decoded.userId
 
     // Get user and mess info
-    const user = await User.findById(userId).populate('messId')
+    const user = await User.findById(userId)
     if (!user || !user.messId) {
       return NextResponse.json(
         { message: 'User not found or not part of a mess' },
+        { status: 404 }
+      )
+    }
+
+    const mess = await Mess.findById(user.messId)
+    if (!mess) {
+      return NextResponse.json(
+        { message: 'Mess not found' },
         { status: 404 }
       )
     }

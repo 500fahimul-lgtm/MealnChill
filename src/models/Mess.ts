@@ -85,6 +85,17 @@ const messSchema = new mongoose.Schema({
     isActive: {
       type: Boolean,
       default: true,
+    },
+    isApproved: {
+      type: Boolean,
+      default: false,
+    },
+    approvedAt: {
+      type: Date,
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
     }
   }],
   currentCycle: {

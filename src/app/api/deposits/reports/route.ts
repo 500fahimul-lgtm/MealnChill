@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
     }
 
     const messId = user.messId
-    console.log('[DEBUG] User ID:', decoded.userId, 'Mess ID:', messId)
 
     const url = new URL(request.url)
     const period = url.searchParams.get('period') || 'current-month' // 'current-month', 'last-month', 'all-time'
@@ -57,12 +56,9 @@ export async function GET(request: NextRequest) {
         break
     }
 
-    console.log('[DEBUG] Period:', period, 'Date range:', startDate, 'to', endDate)
-
     // Check total deposits in this mess
     const totalDepositsInMess = await Deposit.countDocuments({ messId: messId })
     const approvedDepositsInMess = await Deposit.countDocuments({ messId: messId, status: 'approved' })
-    console.log('[DEBUG] Total deposits in mess:', totalDepositsInMess, 'Approved:', approvedDepositsInMess)
 
     // Get all approved deposits for the period with detailed user info
     const deposits = await Deposit.find({
@@ -74,8 +70,6 @@ export async function GET(request: NextRequest) {
     .populate('approvedByUserId', 'name')
     .sort({ createdAt: -1 })
     .lean()
-
-    console.log('[DEBUG] Found deposits in period:', deposits.length)
 
     // Get summary by user
     const userSummary = await Deposit.aggregate([
@@ -218,8 +212,6 @@ export async function GET(request: NextRequest) {
         }
       }
     ])
-
-    console.log('Monthly trends result:', JSON.stringify(monthlyTrends, null, 2))
 
     return NextResponse.json({
       success: true,

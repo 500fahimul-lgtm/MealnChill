@@ -1,6 +1,7 @@
 import connectDB from '@/lib/mongodb'
 import Deposit from '@/models/Deposit'
 import MealAttendance from '@/models/MealAttendance'
+import Mess from '@/models/Mess'
 import User from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
@@ -28,59 +29,81 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
     }
 
-    // Get all active members of the mess
-    const members = await User.find({ messId: decoded.messId, isActive: true })
-      .select('name email phone isAdmin joinedAt')
-      .sort({ joinedAt: 1 })
+    // Get the mess with populated member details
+    const mess = await Mess.findById(decoded.messId)
+      .populate({
+        path: 'members.userId',
+        select: 'name email phone isAdmin joinedAt isActive'
+      })
+      .populate({
+        path: 'members.approvedBy',
+        select: 'name'
+      })
       .lean()
 
-    // Get additional stats for each member
+    if (!mess) {
+      return NextResponse.json({ message: 'Mess not found' }, { status: 404 })
+    }
+
+    const messData = mess as any
+
+    // Process members with their approval status and stats
     const membersWithStats = await Promise.all(
-      members.map(async (member) => {
-        // Get total meals taken since joining (all time)
-        const totalMealsTaken = await MealAttendance.aggregate([
-          {
-            $match: {
-              messId: decoded.messId,
-              userId: member._id
+      messData.members
+        .filter((member: any) => member.userId) // Only check if userId exists, include all members (pending and approved)
+        .map(async (member: any) => {
+          const user = member.userId
+          
+          // Get total meals taken since joining (all time)
+          const totalMealsTaken = await MealAttendance.aggregate([
+            {
+              $match: {
+                messId: decoded.messId,
+                userId: user._id
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                totalMeals: { $sum: { $add: ['$breakfast', '$lunch', '$dinner'] } }
+              }
             }
-          },
-          {
-            $group: {
-              _id: null,
-              totalMeals: { $sum: { $add: ['$breakfast', '$lunch', '$dinner'] } }
-            }
-          }
-        ])
+          ])
 
-        // Get total money paid till now (all approved deposits)
-        const totalMoneyPaid = await Deposit.aggregate([
-          {
-            $match: {
-              messId: decoded.messId,
-              userId: member._id,
-              status: 'approved'
+          // Get total money paid till now (all approved deposits)
+          const totalMoneyPaid = await Deposit.aggregate([
+            {
+              $match: {
+                messId: decoded.messId,
+                userId: user._id,
+                status: 'approved'
+              }
+            },
+            {
+              $group: {
+                _id: null,
+                totalAmount: { $sum: '$amount' }
+              }
             }
-          },
-          {
-            $group: {
-              _id: null,
-              totalAmount: { $sum: '$amount' }
-            }
-          }
-        ])
+          ])
 
-        return {
-          id: (member._id as any).toString(),
-          name: member.name,
-          email: member.email,
-          phone: member.phone,
-          totalMealsTaken: totalMealsTaken[0]?.totalMeals || 0,
-          totalMoneyPaid: totalMoneyPaid[0]?.totalAmount || 0,
-          role: member.isAdmin ? 'admin' : 'member',
-          joinedAt: member.joinedAt
-        }
-      })
+          return {
+            id: user._id.toString(),
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            totalMealsTaken: totalMealsTaken[0]?.totalMeals || 0,
+            totalMoneyPaid: totalMoneyPaid[0]?.totalAmount || 0,
+            role: user.isAdmin ? 'admin' : 'member',
+            joinedAt: member.joinedAt,
+            isApproved: member.isApproved || false,
+            approvedAt: member.approvedAt,
+            approvedBy: member.approvedBy ? {
+              id: member.approvedBy._id,
+              name: member.approvedBy.name
+            } : null
+          }
+        })
     )
 
     return NextResponse.json({
