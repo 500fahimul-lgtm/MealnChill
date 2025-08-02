@@ -91,8 +91,8 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId || decoded.role !== 'admin') {
-      return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
+    if (!decoded || !decoded.messId || !decoded.isAdmin) {
+      return NextResponse.json({ message: 'Unauthorized. Admin access required.' }, { status: 403 })
     }
 
     const { itemName, amount, date } = await request.json()

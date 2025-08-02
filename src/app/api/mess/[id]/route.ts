@@ -83,10 +83,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  console.log('=== PUT API CALLED ===')
   try {
     await connectDB()
-    console.log('Database connected')
 
     // Get token from Authorization header
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
@@ -132,14 +130,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Get update data from request body
     const { name, mealFrequency, mealDeadlines } = await req.json()
-    
-    console.log('Received update data:', { name, mealFrequency, mealDeadlines })
-    console.log('Current mess data before update:', {
-      id: mess._id,
-      name: mess.name,
-      mealFrequency: mess.mealFrequency,
-      mealDeadlines: mess.mealDeadlines
-    })
 
     // Validate data
     if (!name || name.trim().length === 0) {
@@ -192,8 +182,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     if (mealDeadlines) {
       updateData.mealDeadlines = mealDeadlines
     }
-    
-    console.log('Final updateData before database update:', JSON.stringify(updateData, null, 2))
 
     // Update mess using more explicit approach
     const updateResult = await Mess.findByIdAndUpdate(

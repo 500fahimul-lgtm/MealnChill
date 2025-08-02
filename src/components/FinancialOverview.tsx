@@ -14,7 +14,7 @@ interface FinancialData {
   currentBalance: number
   pendingDeposits: number
   activeMembers: number
-  averageDepositPerMember: number
+  averageDepositPerMember: number // This will actually store average expense per member
   monthlyStats: {
     month: string
     deposits: number
@@ -112,6 +112,13 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
         },
       })
 
+      // Fetch expenses data from cost sheet
+      const expensesResponse = await fetch('/api/expenses', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
       // Fetch mess data for member count
       const messResponse = await fetch(`/api/mess/${messId}`, {
         headers: {
@@ -120,39 +127,54 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
       })
 
       let totalDeposits = 0
+      let totalExpenses = 0
       let pendingDeposits = 0
       let activeMembers = 0
 
+      // Get total deposited amount
       if (depositsResponse.ok) {
         const depositsData = await depositsResponse.json()
-        totalDeposits = depositsData.totalDepositedAmountCurrentCycle || 0
+        
+        // Calculate total deposits from approved deposits
+        const approvedDeposits = depositsData.deposits?.filter((d: any) => d.status === 'approved') || []
+        totalDeposits = approvedDeposits.reduce((sum: number, deposit: any) => sum + deposit.amount, 0)
         
         // Count pending deposits
         const pendingCount = depositsData.deposits?.filter((d: any) => d.status === 'pending').length || 0
         pendingDeposits = pendingCount
       }
 
-      if (messResponse.ok && isAdmin) {
-        const messData = await messResponse.json()
-        activeMembers = messData.mess.members?.filter((m: any) => m.isActive).length || 0
+      // Get total expenses from cost sheet
+      if (expensesResponse.ok) {
+        const expensesData = await expensesResponse.json()
+        totalExpenses = expensesData.totalExpenses || 0
       }
 
-      // Mock data for expenses (you can implement actual expense tracking later)
-      const mockExpenses = totalDeposits * 0.85 // Assume 85% of deposits are spent
+      // Get member count
+      if (messResponse.ok) {
+        const messData = await messResponse.json()
+        activeMembers = messData.mess.members?.filter((m: any) => m.isActive !== false).length || 0
+      }
+
+      // Calculate current balance (deposits - expenses)
+      const currentBalance = totalDeposits - totalExpenses
+
+      // Calculate average expense per member
+      const averageExpensePerMember = activeMembers > 0 ? totalExpenses / activeMembers : 0
 
       setFinancialData({
         totalDeposits,
-        totalExpenses: mockExpenses,
-        currentBalance: totalDeposits - mockExpenses,
+        totalExpenses,
+        currentBalance,
         pendingDeposits,
         activeMembers,
-        averageDepositPerMember: activeMembers > 0 ? totalDeposits / activeMembers : 0,
+        averageDepositPerMember: averageExpensePerMember, // This is now average expense per member
         monthlyStats: [
           {
             month: 'Current Month',
             deposits: totalDeposits,
-            expenses: mockExpenses,
-            balance: totalDeposits - mockExpenses
+            expenses: totalExpenses,
+            balance: currentBalance
           }
         ]
       })
@@ -456,7 +478,7 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
         <div className="bg-gradient-to-r from-violet-400 to-violet-500 rounded-lg shadow-lg p-6 text-white">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-violet-50 text-sm font-medium">Avg. per Member</p>
+              <p className="text-violet-50 text-sm font-medium">Avg. Expense per Member</p>
               <p className="text-3xl font-bold">৳{financialData.averageDepositPerMember.toLocaleString()}</p>
             </div>
             <div className="bg-violet-300 bg-opacity-40 rounded-full p-3">
