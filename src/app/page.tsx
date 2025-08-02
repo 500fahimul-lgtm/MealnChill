@@ -2,23 +2,23 @@
 
 import AnimatedIcon from '@/components/ui/AnimatedIcon'
 import {
-  AccountBalance as AccountBalanceIcon,
-  Add as AddIcon,
-  AdminPanelSettings as AdminIcon,
-  Approval as ApprovalIcon,
-  BarChart as ChartIcon,
-  CheckCircle as CheckCircleIcon,
-  Group as GroupIcon,
-  Home as HomeIcon,
-  Info as InfoIcon,
-  Inventory as InventoryIcon,
-  Kitchen as KitchenIcon,
-  AttachMoney as MoneyIcon,
-  Notifications as NotificationsIcon,
-  Person as PersonIcon,
-  Receipt as ReceiptIcon,
-  Restaurant as RestaurantIcon,
-  Settings as SettingsIcon
+    AccountBalance as AccountBalanceIcon,
+    Add as AddIcon,
+    AdminPanelSettings as AdminIcon,
+    Approval as ApprovalIcon,
+    BarChart as ChartIcon,
+    CheckCircle as CheckCircleIcon,
+    Group as GroupIcon,
+    Home as HomeIcon,
+    Info as InfoIcon,
+    Inventory as InventoryIcon,
+    Kitchen as KitchenIcon,
+    AttachMoney as MoneyIcon,
+    Notifications as NotificationsIcon,
+    Person as PersonIcon,
+    Receipt as ReceiptIcon,
+    Restaurant as RestaurantIcon,
+    Settings as SettingsIcon
 } from '@mui/icons-material'
 import { CircularProgress } from '@mui/material'
 import dynamic from 'next/dynamic'
@@ -117,6 +117,7 @@ export default function Home() {
     attendancePercentage: 0
   })
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
+  const [isBadgeBouncing, setIsBadgeBouncing] = useState(false)
   const [recentActivities, setRecentActivities] = useState<Array<{
     id: string
     title: string
@@ -365,6 +366,13 @@ export default function Home() {
       if (response.ok) {
         const data = await response.json()
         const unreadCount = data.notifications?.length || 0
+        
+        // Trigger bounce animation if count increased
+        if (unreadCount > unreadNotificationCount) {
+          setIsBadgeBouncing(true)
+          setTimeout(() => setIsBadgeBouncing(false), 1000)
+        }
+        
         setUnreadNotificationCount(unreadCount)
       }
     } catch (error) {
@@ -1041,7 +1049,7 @@ export default function Home() {
       <nav className={`fixed bottom-0 left-0 right-0 z-40 sm:hidden transition-transform duration-500 ease-out ${
         isNavVisible ? 'translate-y-0' : 'translate-y-full'
       }`}>
-        <div className="bg-white/80 backdrop-blur-xl border-t border-gradient-to-r from-pink-200/60 via-purple-200/60 to-cyan-200/60 shadow-2xl navbar-shimmer">
+        <div className="bg-white/80 backdrop-blur-xl border-t border-gradient-to-r from-pink-200/60 via-purple-200/60 to-cyan-200/60 shadow-2xl">
           <div className="flex items-center justify-around py-1 px-2 bg-gradient-to-r from-transparent via-white/10 to-transparent">
             <BottomNavItem
               icon={<AnimatedIcon type="home" isActive={!activeFeature} />}
@@ -1067,6 +1075,7 @@ export default function Home() {
               isActive={activeFeature === 'notifications'}
               onClick={() => handleFeatureChange('notifications')}
               badge={unreadNotificationCount > 0 ? unreadNotificationCount.toString() : undefined}
+              isBadgeBouncing={isBadgeBouncing}
             />
             <BottomNavItem
               icon={<AnimatedIcon type="person" isActive={activeFeature === 'my-profile'} />}
@@ -1187,12 +1196,13 @@ function ActivityItem({ icon, title, time, color }: {
   )
 }
 
-function BottomNavItem({ icon, label, isActive, onClick, badge }: {
+function BottomNavItem({ icon, label, isActive, onClick, badge, isBadgeBouncing }: {
   icon: React.ReactNode;
   label: string;
   isActive: boolean;
   onClick: () => void;
   badge?: string;
+  isBadgeBouncing?: boolean;
 }) {
   const getActiveColor = () => {
     switch (label.toLowerCase()) {
@@ -1219,7 +1229,9 @@ function BottomNavItem({ icon, label, isActive, onClick, badge }: {
           {icon}
         </div>
         {badge && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-red-400 to-pink-500 text-white text-xs rounded-full flex items-center justify-center font-bold text-[10px] animate-bounce shadow-lg border-2 border-white">
+          <div className={`absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-red-400 to-pink-500 text-white text-xs rounded-full flex items-center justify-center font-bold text-[10px] shadow-lg border-2 border-white ${
+            isBadgeBouncing ? 'animate-bounce' : ''
+          }`}>
             {badge}
           </div>
         )}
@@ -1234,7 +1246,7 @@ function BottomNavItem({ icon, label, isActive, onClick, badge }: {
       {isActive && (
         <div className={`absolute bottom-0 left-1/2 transform -translate-x-1/2 w-6 h-0.5 rounded-full ${
           getActiveColor().replace('text-', 'bg-')
-        } animate-pulse`}></div>
+        }`}></div>
       )}
     </button>
   )

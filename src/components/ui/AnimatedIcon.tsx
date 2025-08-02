@@ -25,12 +25,12 @@ export default function AnimatedIcon({ type, isActive, className = '' }: Animate
       setJustActivated(true)
       const timer = setTimeout(() => {
         setIsAnimating(false)
-        setJustActivated(false)
       }, 800)
       return () => clearTimeout(timer)
     }
     if (!isActive) {
       setJustActivated(false)
+      setIsAnimating(false)
     }
   }, [isActive, justActivated])
 
@@ -123,8 +123,8 @@ export default function AnimatedIcon({ type, isActive, className = '' }: Animate
       <div className={`relative ${isAnimating ? 'animate-pulse' : ''}`}>
         <IconComponent {...baseIconProps} />
         
-        {/* Animated background glow */}
-        {isActive && (
+        {/* Animated background glow - only when animating */}
+        {isAnimating && (
           <>
             <div className={`absolute inset-0 ${colors.glow} rounded-full scale-150 animate-ping opacity-75`}></div>
             <div className={`absolute inset-0 bg-gradient-to-r ${colors.gradient} opacity-20 rounded-full scale-125 animate-pulse`}></div>
