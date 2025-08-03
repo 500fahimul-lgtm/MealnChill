@@ -6,12 +6,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const verifyToken = async (token: string) => {
   try {
-    console.log('Verifying token...')
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    console.log('Token verified successfully, userId:', decoded.userId)
     return decoded
   } catch (error) {
-    console.error('Token verification failed:', error)
     return null
   }
 }
@@ -28,10 +25,6 @@ export async function POST(req: NextRequest) {
         { status: 401 }
       )
     }
-
-    // Debug: Log token for debugging
-    console.log('Received token:', token ? token.substring(0, 20) + '...' : 'null')
-    console.log('Token length:', token ? token.length : 0)
 
     // Verify token
     const decoded = await verifyToken(token)
@@ -82,7 +75,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Create new mess
-    console.log('Creating mess with userId:', userId)
     const messData = {
       name: name.trim(),
       description: description?.trim() || '',
@@ -102,23 +94,18 @@ export async function POST(req: NextRequest) {
       }
     }
     
-    console.log('Mess data before creating model:', messData)
     const newMess = new Mess(messData)
-    console.log('Mess model created, about to validate...')
     
     // Manually validate before saving to catch validation errors
     const validationError = newMess.validateSync()
     if (validationError) {
-      console.error('Validation error:', validationError)
       return NextResponse.json(
         { message: `Validation failed: ${validationError.message}` },
         { status: 400 }
       )
     }
 
-    console.log('About to save mess:', newMess.toObject())
     await newMess.save()
-    console.log('Mess saved successfully with code:', newMess.messCode)
 
     // Update user's messId, isAdmin, and isActive status
     console.log('Updating user with messId:', newMess._id)
@@ -127,7 +114,6 @@ export async function POST(req: NextRequest) {
       isAdmin: true, // Set as admin
       isActive: adminIsActive ?? true
     })
-    console.log('User updated successfully')
 
     // Generate new token with updated messId and admin status
     const newToken = jwt.sign(

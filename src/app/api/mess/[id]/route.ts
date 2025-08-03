@@ -197,13 +197,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         { status: 500 }
       )
     }
-    
-    console.log('Updated mess data:', {
-      id: updateResult._id,
-      name: updateResult.name,
-      mealFrequency: updateResult.mealFrequency,
-      mealDeadlines: updateResult.mealDeadlines
-    })
 
     return NextResponse.json({ 
       message: 'Mess updated successfully',

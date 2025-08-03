@@ -55,6 +55,12 @@ export default function Profile() {
   const [hasActiveRequest, setHasActiveRequest] = useState(false)
   const [showLeaveForm, setShowLeaveForm] = useState(false)
   const [leaveReason, setLeaveReason] = useState('')
+  // New state for admin leave functionality
+  const [showAdminTransferModal, setShowAdminTransferModal] = useState(false)
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false)
+  const [availableMembers, setAvailableMembers] = useState<any[]>([])
+  const [selectedNewAdmin, setSelectedNewAdmin] = useState('')
+  const [totalMembers, setTotalMembers] = useState(0)
   const router = useRouter()
 
   const fetchProfile = async () => {
@@ -206,10 +212,6 @@ export default function Profile() {
   }
 
   const handleLeaveMess = async () => {
-    if (!confirm('Are you sure you want to leave this mess? This action cannot be undone and you will lose access to all mess data.')) {
-      return
-    }
-
     setIsProcessing(true)
     try {
       const token = localStorage.getItem('token')
@@ -217,25 +219,42 @@ export default function Profile() {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
+        body: JSON.stringify({})
       })
 
       if (response.ok) {
         const data = await response.json()
-        setMessage(data.message)
         
-        // Update token with new user info (no messId)
-        if (data.token) {
-          localStorage.setItem('token', data.token)
+        // Handle different response types
+        if (data.requiresConfirmation && data.action === 'DELETE_MESS') {
+          // Show delete confirmation modal
+          setTotalMembers(data.totalMembers)
+          setShowDeleteConfirmModal(true)
+          setMessage('')
+        } else if (data.requiresTransfer && data.action === 'TRANSFER_AND_LEAVE') {
+          // Show transfer modal
+          setAvailableMembers(data.otherMembers)
+          setTotalMembers(data.totalMembers)
+          setShowAdminTransferModal(true)
+          setMessage('')
+        } else {
+          // Successful leave (admin with other admins)
+          setMessage(data.message)
+          
+          // Update token with new user info (no messId)
+          if (data.token) {
+            localStorage.setItem('token', data.token)
+          }
+          
+          // Clear profile state and redirect
+          setProfile(null)
+          
+          setTimeout(() => {
+            router.push('/mess-setup')
+          }, 2000)
         }
-        
-        // Clear profile state and redirect
-        setProfile(null)
-        
-        // Use router for navigation instead of window.location
-        setTimeout(() => {
-          router.push('/mess-setup')
-        }, 2000)
       } else {
         const error = await response.json()
         setMessage(error.message || 'Failed to leave mess')
@@ -275,6 +294,92 @@ export default function Profile() {
       } else {
         const error = await response.json()
         setMessage(error.message || 'Failed to submit leave request')
+      }
+    } catch (error) {
+      setMessage('Network error. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleConfirmDeleteMess = async () => {
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/user/leave-mess', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmAction: 'DELETE_MESS'
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage(data.message)
+        
+        if (data.token) {
+          localStorage.setItem('token', data.token)
+        }
+        
+        setProfile(null)
+        setShowDeleteConfirmModal(false)
+        
+        setTimeout(() => {
+          router.push('/mess-setup')
+        }, 2000)
+      } else {
+        const error = await response.json()
+        setMessage(error.message || 'Failed to delete mess')
+      }
+    } catch (error) {
+      setMessage('Network error. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleTransferAndLeave = async () => {
+    if (!selectedNewAdmin) {
+      setMessage('Please select a member to transfer admin rights to.')
+      return
+    }
+
+    setIsProcessing(true)
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/user/leave-mess', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          confirmAction: 'TRANSFER_AND_LEAVE',
+          transferToUserId: selectedNewAdmin
+        })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessage(data.message)
+        
+        if (data.token) {
+          localStorage.setItem('token', data.token)
+        }
+        
+        setProfile(null)
+        setShowAdminTransferModal(false)
+        
+        setTimeout(() => {
+          router.push('/mess-setup')
+        }, 2000)
+      } else {
+        const error = await response.json()
+        setMessage(error.message || 'Failed to transfer admin rights')
       }
     } catch (error) {
       setMessage('Network error. Please try again.')
@@ -773,6 +878,121 @@ export default function Profile() {
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Transfer Modal */}
+      {showAdminTransferModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Transfer Admin Rights
+            </h3>
+            
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-800">
+                <strong>⚠️ Admin Transfer Required</strong>
+              </p>
+              <p className="text-sm text-yellow-700 mt-1">
+                You are the only admin in this mess with {totalMembers} member(s). 
+                You must transfer admin rights to another member before you can leave.
+              </p>
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select New Admin
+              </label>
+              <select
+                value={selectedNewAdmin}
+                onChange={(e) => setSelectedNewAdmin(e.target.value)}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                required
+              >
+                <option value="">Choose a member...</option>
+                {availableMembers.map((member) => (
+                  <option key={member._id} value={member._id}>
+                    {member.name} ({member.email})
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-blue-700">
+                <strong>Note:</strong> The selected member will receive admin privileges and you will leave the mess. 
+                This action cannot be undone.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAdminTransferModal(false)
+                  setSelectedNewAdmin('')
+                  setAvailableMembers([])
+                }}
+                className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleTransferAndLeave}
+                disabled={isProcessing || !selectedNewAdmin}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+              >
+                {isProcessing ? 'Transferring...' : 'Transfer & Leave'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Mess Confirmation Modal */}
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              ⚠️ Delete Mess Confirmation
+            </h3>
+            
+            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800 font-medium mb-2">
+                DANGER: This action will permanently delete the mess!
+              </p>
+              <p className="text-sm text-red-700">
+                You are the only member in this mess. Leaving will:
+              </p>
+              <ul className="text-sm text-red-700 mt-2 ml-4 list-disc">
+                <li>Permanently delete the entire mess</li>
+                <li>Remove all mess data (meals, expenses, etc.)</li>
+                <li>Cannot be undone</li>
+              </ul>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-gray-600">
+                If you want to keep the mess, consider inviting other members first, 
+                then transferring admin rights instead of deleting.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteConfirmModal(false)}
+                className="flex-1 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDeleteMess}
+                disabled={isProcessing}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-400 transition-colors"
+              >
+                {isProcessing ? 'Deleting...' : 'Delete Mess & Leave'}
+              </button>
             </div>
           </div>
         </div>

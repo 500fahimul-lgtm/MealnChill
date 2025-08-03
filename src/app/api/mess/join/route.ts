@@ -6,12 +6,9 @@ import { NextRequest, NextResponse } from 'next/server'
 
 const verifyToken = async (token: string) => {
   try {
-    console.log('Join API - Verifying token...')
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    console.log('Join API - Token verified successfully, userId:', decoded.userId)
     return decoded
   } catch (error) {
-    console.error('Join API - Token verification failed:', error)
     return null
   }
 }

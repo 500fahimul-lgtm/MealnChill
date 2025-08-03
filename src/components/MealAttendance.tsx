@@ -548,8 +548,6 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         }))
       }
 
-      console.log('DEBUG: Sending meal preparation request:', requestBody)
-
       const response = await fetch('/api/meal-preparation', {
         method: 'POST',
         headers: {
@@ -1068,9 +1066,6 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
           </div>
         </div>
       </div>
-
-      {/* Debug Info */}
-      {/* Debug information section removed */}
 
       {/* Toast Notifications */}
       <div className="fixed bottom-4 right-4 z-50 space-y-3 max-w-md">
