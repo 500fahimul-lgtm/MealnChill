@@ -115,6 +115,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const [inventoryModal, setInventoryModal] = useState<InventoryModal | null>(null)
   const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
   const [selectedInventoryItems, setSelectedInventoryItems] = useState<InventoryDeductionItem[]>([])
+  const [isUserActive, setIsUserActive] = useState<boolean>(true) // Track if user is active
 
   // Local state for pending changes (not yet saved)
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: { isMealOn?: boolean, extraMealCount?: number } }>({})
@@ -219,6 +220,31 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     }
   }, [messId])
 
+  // Fetch user's active status from mess members
+  const fetchUserActiveStatus = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch(`/api/mess/${messId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        const currentUserMember = data.mess?.members?.find((member: any) => 
+          member.userId.toString() === userId
+        )
+        if (currentUserMember) {
+          setIsUserActive(currentUserMember.isActive !== false) // Default to true if not specified
+        }
+      }
+    } catch (error) {
+      // Handle error silently, default to active
+      setIsUserActive(true)
+    }
+  }, [messId, userId])
+
   // Set up real-time deadline checking
   useEffect(() => {
     updateDeadlineStatus()
@@ -285,14 +311,24 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     // Fetch both mess settings and attendance data on component mount
     const initializeData = async () => {
       await fetchMessSettings() // Fetch mess settings first
+      await fetchUserActiveStatus() // Fetch user's active status
       await fetchAttendanceData() // Then fetch attendance data
     }
 
     initializeData()
-  }, [fetchMessSettings, fetchAttendanceData])
+  }, [fetchMessSettings, fetchUserActiveStatus, fetchAttendanceData])
 
   // Toggle functions that only update local state (no API call)
   const toggleMealStatus = (mealSlot: string, currentValue: boolean) => {
+    // Check if user is deactivated
+    if (!isUserActive && !isAdmin) {
+      showToast(
+        'You are deactivated by admin. Please ask admin to activate your meals.',
+        'warning'
+      )
+      return
+    }
+
     const deadline = deadlineStatus[mealSlot]
     const summary = getSummaryForSlot(mealSlot)
 
@@ -324,6 +360,15 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   }
 
   const updateExtraMealCount = (mealSlot: string, count: number) => {
+    // Check if user is deactivated
+    if (!isUserActive && !isAdmin) {
+      showToast(
+        'You are deactivated by admin. Please ask admin to activate your meals.',
+        'warning'
+      )
+      return
+    }
+
     const deadline = deadlineStatus[mealSlot]
     const summary = getSummaryForSlot(mealSlot)
 
@@ -359,6 +404,15 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
 
   // Save function that sends changes to API
   const saveAttendanceChanges = async (mealSlot: string) => {
+    // Check if user is deactivated
+    if (!isUserActive && !isAdmin) {
+      showToast(
+        'You are deactivated by admin. Please ask admin to activate your meals.',
+        'warning'
+      )
+      return
+    }
+
     const changes = pendingChanges[mealSlot]
     if (!changes) {
 
@@ -756,6 +810,13 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                         Admin Override
                       </span>
                     )}
+                    {/* Deactivated User Badge */}
+                    {!isUserActive && !isAdmin && (
+                      <span className="text-xs text-red-600 bg-red-100 px-2 py-1 rounded font-semibold text-center flex items-center">
+                        <Block style={{ fontSize: '0.875rem' }} className="mr-1" />
+                        Deactivated - Contact Admin
+                      </span>
+                    )}
                     {hasChanges && (
                       <>
                         <span className="text-xs text-orange-600 bg-orange-100 px-2 py-1 rounded font-semibold text-center flex items-center">
@@ -793,9 +854,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                     <label className="text-sm font-medium text-gray-700 min-w-0 flex-shrink-0">Meal Status:</label>
                     <button
                       onClick={() => toggleMealStatus(slot.key, isMealOn)}
-                      disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin)}
+                      disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin) || (!isUserActive && !isAdmin)}
                       className={`relative inline-flex items-center h-6 rounded-full w-11 transition-all duration-200 transform flex-shrink-0 ${isMealOn ? 'bg-green-600' : 'bg-gray-400'
-                        } ${isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin)
+                        } ${isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin) || (!isUserActive && !isAdmin)
                           ? 'scale-95 opacity-50 cursor-not-allowed'
                           : 'hover:scale-105 active:scale-95'
                         }`}
@@ -827,7 +888,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                     <div className="flex items-center space-x-2">
                       <button
                         onClick={() => updateExtraMealCount(slot.key, Math.max(0, extraMealCount - 1))}
-                        disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin) || extraMealCount <= 0}
+                        disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin) || (!isUserActive && !isAdmin) || extraMealCount <= 0}
                         className="w-8 h-8 bg-red-500 hover:bg-red-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 flex-shrink-0"
                       >
                         −
@@ -839,13 +900,13 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                           max="10"
                           value={extraMealCount}
                           onChange={(e) => updateExtraMealCount(slot.key, parseInt(e.target.value) || 0)}
-                          disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin)}
+                          disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin) || (!isUserActive && !isAdmin)}
                           className="w-12 h-8 text-center border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed text-sm flex-shrink-0 text-gray-900 bg-white"
                         />
                       </div>
                       <button
                         onClick={() => updateExtraMealCount(slot.key, Math.min(10, extraMealCount + 1))}
-                        disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin) || extraMealCount >= 10}
+                        disabled={isSaving || (!deadline?.canModify && !isAdmin) || (isMealPrepared && !isAdmin) || (!isUserActive && !isAdmin) || extraMealCount >= 10}
                         className="w-8 h-8 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-full flex items-center justify-center text-sm font-bold transition-all duration-200 flex-shrink-0"
                       >
                         +

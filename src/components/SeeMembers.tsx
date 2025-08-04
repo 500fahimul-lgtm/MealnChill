@@ -81,8 +81,8 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
     try {
       const token = localStorage.getItem('token')
       
-      // If admin, fetch from mess endpoint to get pending members
-      const endpoint = isAdmin ? `/api/mess/${messId}` : '/api/members'
+      // Both admin and regular members fetch from the same endpoint but only show approved members
+      const endpoint = '/api/members'
       const response = await fetch(endpoint, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -91,26 +91,13 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
 
       if (response.ok) {
         const data = await response.json()
-        if (isAdmin && data.mess?.members) {
-          // Transform mess member data to match MemberData interface
-          const transformedMembers = data.mess.members.map((member: any) => ({
-            id: member.userId,
-            name: member.name,
-            email: member.email,
-            phone: member.phone,
-            totalMealsTaken: 0, // Would need additional API call for stats
-            totalMoneyPaid: 0,  // Would need additional API call for stats
-            role: member.role || (member.isActive ? 'member' : 'pending'),
-            joinedAt: member.joinedAt,
-            isActive: member.isActive,
-            isPending: member.isPending || !member.isActive
-          }))
-          setMembers(transformedMembers)
-          setFilteredMembers(transformedMembers)
-        } else {
-          setMembers(data.members)
-          setFilteredMembers(data.members)
-        }
+        
+        // Show all members (both admins and regular members)
+        // Remove restrictive filtering that was causing empty lists
+        const validMembers = data.members || []
+        
+        setMembers(validMembers)
+        setFilteredMembers(validMembers)
       }
     } catch (error) {
       // Handle error silently
@@ -158,11 +145,15 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
     setIsProcessing(true)
     try {
       const token = localStorage.getItem('token')
-      const response = await fetch(`/api/members/${memberId}/remove`, {
-        method: 'POST',
+      const response = await fetch('/api/members', {
+        method: 'DELETE',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
+        body: JSON.stringify({
+          userId: memberId
+        })
       })
 
       if (response.ok) {
@@ -172,64 +163,6 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
       } else {
         const error = await response.json()
         showToast(error.message || 'Failed to remove member', 'error')
-      }
-    } catch (error) {
-      showToast('Network error. Please try again.', 'error')
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  const handleApproveMember = async (memberId: string, memberName: string) => {
-    setIsProcessing(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/mess/${messId}/members/approve`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ userId: memberId }),
-      })
-
-      if (response.ok) {
-        showToast(`${memberName} has been approved and added to the mess`, 'success')
-        await fetchMembers()
-      } else {
-        const error = await response.json()
-        showToast(error.message || 'Failed to approve member', 'error')
-      }
-    } catch (error) {
-      showToast('Network error. Please try again.', 'error')
-    } finally {
-      setIsProcessing(false)
-    }
-  }
-
-  const handleRejectMember = async (memberId: string, memberName: string) => {
-    if (!confirm(`Are you sure you want to reject ${memberName}'s join request?`)) {
-      return
-    }
-
-    setIsProcessing(true)
-    try {
-      const token = localStorage.getItem('token')
-      const response = await fetch(`/api/mess/${messId}/members/reject`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({ userId: memberId }),
-      })
-
-      if (response.ok) {
-        showToast(`${memberName}'s join request has been rejected`, 'success')
-        await fetchMembers()
-      } else {
-        const error = await response.json()
-        showToast(error.message || 'Failed to reject member', 'error')
       }
     } catch (error) {
       showToast('Network error. Please try again.', 'error')
@@ -421,67 +354,42 @@ export default function SeeMembers({ messId, isAdmin }: SeeMembersProps) {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        member.isPending 
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : member.role === 'admin'
+                        member.role === 'admin'
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-blue-100 text-blue-800'
                         }`}>
-                        {member.isPending 
-                          ? 'Pending' 
-                          : member.role.charAt(0).toUpperCase() + member.role.slice(1)}
+                        {member.role.charAt(0).toUpperCase() + member.role.slice(1)}
                       </span>
                     </td>
                     {isAdmin && (
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex space-x-2">
-                          {member.isPending ? (
-                            <>
-                              <button
-                                onClick={() => handleApproveMember(member.id, member.name)}
-                                disabled={isProcessing}
-                                className="text-green-600 hover:text-green-900 disabled:text-gray-400 text-sm font-medium"
-                              >
-                                Approve
-                              </button>
-                              <button
-                                onClick={() => handleRejectMember(member.id, member.name)}
-                                disabled={isProcessing}
-                                className="text-red-600 hover:text-red-900 disabled:text-gray-400 text-sm font-medium"
-                              >
-                                Reject
-                              </button>
-                            </>
+                          {!isMemberAdmin ? (
+                            <button
+                              onClick={() => setConfirmModal({ open: true, action: 'promote', member })}
+                              disabled={isProcessing}
+                              className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 text-sm"
+                            >
+                              Promote to admin
+                            </button>
                           ) : (
-                            <>
-                              {!isMemberAdmin ? (
-                                <button
-                                  onClick={() => setConfirmModal({ open: true, action: 'promote', member })}
-                                  disabled={isProcessing}
-                                  className="text-blue-600 hover:text-blue-900 disabled:text-gray-400 text-sm"
-                                >
-                                  Promote to admin
-                                </button>
-                              ) : (
-                                canDemote && (
-                                  <button
-                                    onClick={() => setConfirmModal({ open: true, action: 'demote', member })}
-                                    disabled={isProcessing}
-                                    className="text-orange-600 hover:text-orange-900 disabled:text-gray-400 text-sm"
-                                  >
-                                    Demote to member
-                                  </button>
-                                )
-                              )}
+                            canDemote && (
                               <button
-                                onClick={() => handleRemoveMember(member.id, member.name)}
+                                onClick={() => setConfirmModal({ open: true, action: 'demote', member })}
                                 disabled={isProcessing}
-                                className="text-red-600 hover:text-red-900 disabled:text-gray-400 text-sm"
+                                className="text-orange-600 hover:text-orange-900 disabled:text-gray-400 text-sm"
                               >
-                                Remove
+                                Demote to member
                               </button>
-                            </>
+                            )
                           )}
+                          <button
+                            onClick={() => handleRemoveMember(member.id, member.name)}
+                            disabled={isProcessing}
+                            className="text-red-600 hover:text-red-900 disabled:text-gray-400 text-sm"
+                          >
+                            Remove
+                          </button>
                         </div>
                       </td>
                     )}

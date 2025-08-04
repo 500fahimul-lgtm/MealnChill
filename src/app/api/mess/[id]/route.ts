@@ -34,7 +34,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     // Get mess data with populated member details
-    const mess = await Mess.findById(messId).populate('members.userId', 'name email phone')
+    const mess = await Mess.findById(messId)
+      .populate('members.userId', 'name email phone isAdmin')
+      .populate('adminId', 'name email phone isAdmin')
+      .populate('adminIds', 'name email phone isAdmin')
     if (!mess) {
       return NextResponse.json(
         { message: 'Mess not found' },
@@ -43,8 +46,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
 
     // Check if user is admin
-    const isAdmin = mess.adminIds?.some((adminId: any) => adminId.toString() === userId) ||
-                   mess.adminId.toString() === userId
+    const isAdmin = mess.adminIds?.some((adminId: any) => adminId._id.toString() === userId) ||
+                   mess.adminId._id.toString() === userId
 
     if (!isAdmin) {
       return NextResponse.json(
@@ -52,6 +55,59 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         { status: 403 }
       )
     }
+
+    // Create a comprehensive member list including all admins and members
+    const allMembers: any[] = []
+    
+    // Add main admin
+    if (mess.adminId) {
+      allMembers.push({
+        userId: mess.adminId._id,
+        name: mess.adminId.name,
+        email: mess.adminId.email,
+        phone: mess.adminId.phone,
+        role: 'admin',
+        isActive: true,
+        joinedAt: mess.createdAt || new Date(),
+        isPending: false
+      })
+    }
+    
+    // Add additional admins (if they're not the main admin)
+    if (mess.adminIds && mess.adminIds.length > 0) {
+      mess.adminIds.forEach((admin: any) => {
+        if (admin._id.toString() !== mess.adminId._id.toString()) {
+          allMembers.push({
+            userId: admin._id,
+            name: admin.name,
+            email: admin.email,
+            phone: admin.phone,
+            role: 'admin',
+            isActive: true,
+            joinedAt: mess.createdAt || new Date(),
+            isPending: false
+          })
+        }
+      })
+    }
+    
+    // Add regular members
+    mess.members.forEach((member: any) => {
+      // Skip if this user is already added as an admin
+      const isAlreadyAdmin = allMembers.some(m => m.userId.toString() === member.userId._id.toString())
+      if (!isAlreadyAdmin) {
+        allMembers.push({
+          userId: member.userId._id,
+          name: member.userId.name,
+          email: member.userId.email,
+          phone: member.userId.phone,
+          role: member.userId.isAdmin ? 'admin' : 'member',
+          isActive: member.isActive,
+          joinedAt: member.joinedAt,
+          isPending: !member.isActive
+        })
+      }
+    })
 
     // Format the response data
     const messData = {
@@ -61,15 +117,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       mealFrequency: mess.mealFrequency,
       adminIsActive: mess.adminIsActive,
       mealDeadlines: mess.mealDeadlines,
-      members: mess.members.map((member: any) => ({
-        userId: member.userId._id,
-        name: member.userId.name,
-        email: member.userId.email,
-        phone: member.userId.phone,
-        isActive: member.isActive,
-        joinedAt: member.joinedAt,
-        isPending: !member.isActive
-      }))
+      members: allMembers
     }
 
     return NextResponse.json({ mess: messData })
