@@ -107,11 +107,12 @@ export async function POST(req: NextRequest) {
 
     await newMess.save()
 
-    // Update user's messId, isAdmin, and isActive status
+    // Update user's messId, role, and isActive status
     console.log('Updating user with messId:', newMess._id)
     await User.findByIdAndUpdate(userId, {
       messId: newMess._id,
-      isAdmin: true, // Set as admin
+      role: 'admin', // Set role as admin
+      isAdmin: true, // Set as admin (for compatibility)
       isActive: adminIsActive ?? true
     })
 

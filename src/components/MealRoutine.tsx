@@ -1,16 +1,16 @@
 'use client'
 
 import {
-  Add,
-  ChevronLeft,
-  ChevronRight,
-  Close,
-  DarkMode,
-  Edit,
-  RestaurantMenu,
-  Save,
-  WbSunny,
-  WbTwilight
+    Add,
+    ChevronLeft,
+    ChevronRight,
+    Close,
+    DarkMode,
+    Edit,
+    RestaurantMenu,
+    Save,
+    WbSunny,
+    WbTwilight
 } from '@mui/icons-material'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -79,24 +79,30 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
       const startDate = formatDateForAPI(weekDates[0])
       const endDate = formatDateForAPI(weekDates[6])
       
+      console.log('Fetching meal routines for:', { startDate, endDate })
+      
       const response = await fetch(`/api/meal-routine?startDate=${startDate}&endDate=${endDate}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       })
 
+      const data = await response.json()
+      console.log('Fetch response:', { status: response.status, data })
+
       if (response.ok) {
-        const data = await response.json()
-        
         // Validate that all received routines are within the expected date range
         const validRoutines = data.routines.filter((routine: MealRoutineItem) => {
           return routine.date >= startDate && routine.date <= endDate
         })
         
+        console.log('Valid routines:', validRoutines)
         setMealRoutines(validRoutines)
+      } else {
+        console.error('Failed to fetch meal routines:', data.message)
       }
     } catch (error) {
-      // Handle error silently
+      console.error('Error fetching meal routines:', error)
     } finally {
       setIsLoading(false)
     }
@@ -156,6 +162,12 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
 
     try {
       const token = localStorage.getItem('token')
+      console.log('Saving meal with data:', {
+        date: editingMeal.date,
+        mealSlot: editingMeal.slot,
+        ...editForm
+      })
+      
       const response = await fetch('/api/meal-routine', {
         method: 'POST',
         headers: {
@@ -169,12 +181,20 @@ export default function MealRoutine({ messId, isAdmin, mealFrequency }: MealRout
         })
       })
 
+      const data = await response.json()
+      console.log('API Response:', { status: response.status, data })
+
       if (response.ok) {
         await fetchMealRoutines()
         setEditingMeal(null)
+        console.log('Meal saved successfully')
+      } else {
+        console.error('Failed to save meal:', data.message)
+        alert(`Failed to save meal: ${data.message}`)
       }
     } catch (error) {
-      // Handle error silently
+      console.error('Error saving meal:', error)
+      alert('Network error. Please try again.')
     }
   }
 

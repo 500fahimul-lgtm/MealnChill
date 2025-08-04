@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     // Get token from Authorization header
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
+      console.log('POST /api/meal-routine: No token provided')
       return NextResponse.json(
         { message: 'No token provided' },
         { status: 401 }
@@ -84,25 +85,39 @@ export async function POST(req: NextRequest) {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
     const userId = decoded.userId
+    console.log('POST /api/meal-routine: User ID:', userId)
 
     // Check if user is admin
     const user = await User.findById(userId).populate('messId')
+    console.log('POST /api/meal-routine: User found:', { 
+      id: user?._id, 
+      role: user?.role, 
+      messId: user?.messId?._id 
+    })
+    
     if (!user || !user.messId || user.role !== 'admin') {
+      console.log('POST /api/meal-routine: Authorization failed - not admin or no mess')
       return NextResponse.json(
         { message: 'Only admin can create/update meal routines' },
         { status: 403 }
       )
     }
 
+    const requestBody = await req.json()
+    console.log('POST /api/meal-routine: Request body:', requestBody)
+    
     const { 
       date, 
       mealSlot, 
       mealName, 
       mealDescription = ''
-    } = await req.json()
+    } = requestBody
 
     // Validate required fields
     if (!date || !mealSlot || !mealName) {
+      console.log('POST /api/meal-routine: Validation failed - missing required fields:', {
+        date, mealSlot, mealName
+      })
       return NextResponse.json(
         { message: 'Date, meal slot, and meal name are required' },
         { status: 400 }
@@ -111,11 +126,20 @@ export async function POST(req: NextRequest) {
 
     // Validate meal slot
     if (!['breakfast', 'lunch', 'dinner'].includes(mealSlot)) {
+      console.log('POST /api/meal-routine: Invalid meal slot:', mealSlot)
       return NextResponse.json(
         { message: 'Invalid meal slot' },
         { status: 400 }
       )
     }
+
+    console.log('POST /api/meal-routine: Attempting to save meal routine:', {
+      messId: user.messId._id,
+      date,
+      mealSlot,
+      mealName,
+      mealDescription
+    })
 
     // Update or create meal routine
     const mealRoutine = await MealRoutine.findOneAndUpdate(
@@ -137,6 +161,13 @@ export async function POST(req: NextRequest) {
         new: true 
       }
     )
+
+    console.log('POST /api/meal-routine: Meal routine saved successfully:', {
+      id: mealRoutine._id,
+      date: mealRoutine.date,
+      mealSlot: mealRoutine.mealSlot,
+      mealName: mealRoutine.mealName
+    })
 
     return NextResponse.json({
       message: 'Meal routine saved successfully',
