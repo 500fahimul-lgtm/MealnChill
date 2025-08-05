@@ -22,8 +22,17 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId) {
+    if (!decoded || !decoded.userId) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
+    }
+
+    // Get user's current mess membership status from database
+    // This handles cases where JWT token is stale (created before mess approval)
+    const User = (await import('@/models/User')).default
+    const user = await User.findById(decoded.userId)
+    
+    if (!user || !user.messId) {
+      return NextResponse.json({ message: 'User is not part of any mess' }, { status: 403 })
     }
 
     const { searchParams } = new URL(request.url)
@@ -33,7 +42,7 @@ export async function GET(request: NextRequest) {
     const skip = (page - 1) * limit
 
     // Build query
-    let query: any = { messId: decoded.messId }
+    let query: any = { messId: user.messId }
     if (itemId) {
       query.inventoryItemId = itemId
     }

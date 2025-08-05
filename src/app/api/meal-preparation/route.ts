@@ -4,10 +4,18 @@ import Inventory from '@/models/Inventory'
 import InventoryRecord from '@/models/InventoryRecord'
 import MealAttendance from '@/models/MealAttendance'
 import MealRoutine from '@/models/MealRoutine'
+import Mess from '@/models/Mess'
 import Notification from '@/models/Notification'
 import User from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
+
+// Helper function to handle floating point precision issues
+const parseQuantity = (value: string | number): number => {
+  const parsed = typeof value === 'string' ? parseFloat(value) : value
+  // Round to 2 decimal places to avoid floating point precision issues
+  return Math.round(parsed * 100) / 100
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -95,38 +103,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'This meal has already been marked as prepared' }, { status: 400 })
     }
 
-    // Ensure admin's attendance is set to "meal on" if no attendance record exists
-    // This fixes the issue where admin can't mark meal as done if they don't have attendance set
-    const adminAttendanceResult = await MealAttendance.findOneAndUpdate(
-      {
-        userId,
-        messId,
-        date: mealDate,
-        mealSlot
-      },
-      {
-        $setOnInsert: {
-          userId,
+    // Get all active mess members
+    const messData = await Mess.findById(messId)
+    if (!messData) {
+      return NextResponse.json({ message: 'Mess not found' }, { status: 404 })
+    }
+    
+    const activeMembers = messData.members.filter((member: any) => member.isActive)
+    
+    console.log(`DEBUG: Found ${activeMembers.length} active members`)
+
+    // Ensure ALL active members have attendance records for this meal slot
+    // This fixes the issue where members without records don't get counted properly
+    for (const member of activeMembers) {
+      const memberAttendanceResult = await MealAttendance.findOneAndUpdate(
+        {
+          userId: member.userId,
           messId,
           date: mealDate,
-          mealSlot,
-          isMealOn: true,  // Default admin to meal on
-          extraMealCount: 0
+          mealSlot
+        },
+        {
+          $setOnInsert: {
+            userId: member.userId,
+            messId,
+            date: mealDate,
+            mealSlot,
+            isMealOn: true,  // Default all members to meal on
+            extraMealCount: 0
+          }
+        },
+        { 
+          upsert: true,
+          setDefaultsOnInsert: true,
+          new: true
         }
-      },
-      { 
-        upsert: true,
-        setDefaultsOnInsert: true,
-        new: true
-      }
-    )
+      )
 
-    // Log if admin attendance was created/ensured
-    console.log(`Admin attendance ensured for ${mealSlot} on ${date}:`, {
-      adminUserId: userId,
-      isMealOn: adminAttendanceResult.isMealOn,
-      wasNewRecord: !adminAttendanceResult.createdAt || new Date(adminAttendanceResult.createdAt) > new Date(Date.now() - 1000)
-    })
+      const wasNewRecord = !memberAttendanceResult.updatedAt || 
+        (memberAttendanceResult.createdAt && 
+         new Date(memberAttendanceResult.createdAt) > new Date(Date.now() - 1000))
+      
+      if (wasNewRecord) {
+        console.log(`Created default attendance record for member ${member.userId} (${member.name || 'Unknown'})`)
+      }
+    }
 
     // Get attendance data to calculate total meals needed
     const attendanceData = await MealAttendance.find({
@@ -177,7 +198,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (inventoryItem) {
-          const quantityToDeduct = parseFloat(customItem.quantityToDeduct)
+          const quantityToDeduct = parseQuantity(customItem.quantityToDeduct)
           console.log(`DEBUG: Processing ${inventoryItem.itemName}: current=${inventoryItem.quantity}, toDeduct=${quantityToDeduct}, type=${typeof quantityToDeduct}`)
           
           if (isNaN(quantityToDeduct) || quantityToDeduct <= 0) {
@@ -200,8 +221,8 @@ export async function POST(req: NextRequest) {
             })
           } else {
             const previousQuantity = inventoryItem.quantity
-            // Deduct from inventory
-            inventoryItem.quantity -= quantityToDeduct
+            // Deduct from inventory with proper precision handling
+            inventoryItem.quantity = parseQuantity(inventoryItem.quantity - quantityToDeduct)
             inventoryItem.lastUpdated = new Date()
             inventoryItem.updatedByUserId = userId
             
@@ -446,8 +467,8 @@ export async function DELETE(req: NextRequest) {
           const quantityToRestore = record.previousQuantity - record.newQuantity // Amount that was deducted
           const previousQuantity = inventoryItem.quantity
           
-          // Add back to inventory
-          inventoryItem.quantity += quantityToRestore
+          // Add back to inventory with proper precision handling
+          inventoryItem.quantity = parseQuantity(inventoryItem.quantity + quantityToRestore)
           inventoryItem.lastUpdated = new Date()
           inventoryItem.updatedByUserId = userId
           await inventoryItem.save()

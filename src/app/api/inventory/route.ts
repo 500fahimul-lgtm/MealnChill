@@ -4,6 +4,13 @@ import Inventory from '@/models/Inventory'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
+// Helper function to handle floating point precision issues
+const parseQuantity = (value: string | number): number => {
+  const parsed = typeof value === 'string' ? parseFloat(value) : value
+  // Round to 2 decimal places to avoid floating point precision issues
+  return Math.round(parsed * 100) / 100
+}
+
 const verifyToken = async (token: string) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
@@ -23,12 +30,21 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId) {
+    if (!decoded || !decoded.userId) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
     }
 
-    const inventory = await Inventory.find({ messId: decoded.messId })
-      .sort({ name: 1 })
+    // Get user's current mess membership status from database
+    // This handles cases where JWT token is stale (created before mess approval)
+    const User = (await import('@/models/User')).default
+    const user = await User.findById(decoded.userId)
+    
+    if (!user || !user.messId) {
+      return NextResponse.json({ message: 'User is not part of any mess' }, { status: 403 })
+    }
+
+    const inventory = await Inventory.find({ messId: user.messId })
+      .sort({ itemName: 1 })
       .lean()
 
     return NextResponse.json({ inventory })
@@ -48,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId || decoded.role !== 'admin') {
+    if (!decoded || !decoded.messId || !decoded.isAdmin) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 
@@ -73,9 +89,9 @@ export async function POST(request: NextRequest) {
     if (existingItem) {
       // Update existing item
       previousQuantity = existingItem.quantity
-      existingItem.quantity += parseFloat(quantity)
+      existingItem.quantity = parseQuantity(existingItem.quantity + parseQuantity(quantity))
       existingItem.category = category || existingItem.category
-      if (lowStockThreshold !== undefined) existingItem.lowStockThreshold = parseFloat(lowStockThreshold)
+      if (lowStockThreshold !== undefined) existingItem.lowStockThreshold = parseQuantity(lowStockThreshold)
       existingItem.updatedByUserId = decoded.userId
       savedItem = await existingItem.save()
       action = 'UPDATE'
@@ -84,10 +100,10 @@ export async function POST(request: NextRequest) {
       const inventoryItem = new Inventory({
         messId: decoded.messId,
         itemName,
-        quantity: parseFloat(quantity),
+        quantity: parseQuantity(quantity),
         unit: unit.toLowerCase(),
         category: category || 'Other',
-        lowStockThreshold: lowStockThreshold !== undefined ? parseFloat(lowStockThreshold) : 10,
+        lowStockThreshold: lowStockThreshold !== undefined ? parseQuantity(lowStockThreshold) : 10,
         updatedByUserId: decoded.userId
       })
       savedItem = await inventoryItem.save()
@@ -127,7 +143,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId || decoded.role !== 'admin') {
+    if (!decoded || !decoded.messId || !decoded.isAdmin) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 
@@ -153,8 +169,8 @@ export async function PUT(request: NextRequest) {
     if (itemName) item.itemName = itemName.trim()
     if (category) item.category = category
     if (unit) item.unit = unit.toLowerCase()
-    if (lowStockThreshold !== undefined) item.lowStockThreshold = parseFloat(lowStockThreshold)
-    item.quantity = parseFloat(quantity)
+    if (lowStockThreshold !== undefined) item.lowStockThreshold = parseQuantity(lowStockThreshold)
+    item.quantity = parseQuantity(quantity)
     item.updatedByUserId = decoded.userId
     const savedItem = await item.save()
 
@@ -216,7 +232,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId || decoded.role !== 'admin') {
+    if (!decoded || !decoded.messId || !decoded.isAdmin) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 

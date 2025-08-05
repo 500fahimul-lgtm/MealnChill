@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user is admin
     const user = await User.findById(decoded.userId)
-    if (!user || decoded.role !== 'admin') {
+    if (!user || !decoded.isAdmin) {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 
