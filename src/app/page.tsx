@@ -839,16 +839,18 @@ export default function Home() {
                   <div className="space-y-3">
                     {mealsLoading ? (
                       <>
-                        <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl border border-amber-200/50">
-                          <div className="flex items-center space-x-3">
-                            <div className="w-10 h-10 bg-slate-200 rounded-lg animate-pulse"></div>
-                            <div>
-                              <div className="h-4 w-16 bg-slate-200 rounded animate-pulse mb-1"></div>
-                              <div className="h-3 w-12 bg-slate-200 rounded animate-pulse"></div>
+                        {(!user || user.mess.mealFrequency === 3) && (
+                          <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl border border-amber-200/50">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-slate-200 rounded-lg animate-pulse"></div>
+                              <div>
+                                <div className="h-4 w-16 bg-slate-200 rounded animate-pulse mb-1"></div>
+                                <div className="h-3 w-12 bg-slate-200 rounded animate-pulse"></div>
+                              </div>
                             </div>
+                            <div className="h-6 w-16 bg-slate-200 rounded animate-pulse"></div>
                           </div>
-                          <div className="h-6 w-16 bg-slate-200 rounded animate-pulse"></div>
-                        </div>
+                        )}
                         <div className="flex items-center justify-between p-3 bg-white/60 rounded-xl border border-amber-200/50">
                           <div className="flex items-center space-x-3">
                             <div className="w-10 h-10 bg-slate-200 rounded-lg animate-pulse"></div>
@@ -872,11 +874,13 @@ export default function Home() {
                       </>
                     ) : (
                       <>
-                        <TodayMealCard 
-                          time="08:00 AM" 
-                          meal="Breakfast" 
-                          menuItem={todayMeals.breakfast}
-                        />
+                        {user.mess.mealFrequency === 3 && (
+                          <TodayMealCard 
+                            time="08:00 AM" 
+                            meal="Breakfast" 
+                            menuItem={todayMeals.breakfast}
+                          />
+                        )}
                         <TodayMealCard 
                           time="01:00 PM" 
                           meal="Lunch" 
