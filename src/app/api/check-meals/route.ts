@@ -36,14 +36,15 @@ export async function GET(req: NextRequest) {
       isActive: true
     }).sort({ date: -1 }).limit(10)
 
-    const today = new Date()
-    const todayStr = today.toISOString().split('T')[0]
-    // Use local date to avoid timezone issues
-    const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    // Get current time in Bangladesh timezone (GMT+6)
+    const now = new Date()
+    const bdTime = new Date(now.getTime() + (6 * 60 * 60 * 1000)) // Add 6 hours for BD
+    const todayStr = bdTime.toISOString().split('T')[0]
+    const normalizedToday = new Date(bdTime.getFullYear(), bdTime.getMonth(), bdTime.getDate())
     
-    console.log('Check-meals date debug:', {
-      serverTime: today.toISOString(),
-      serverTimeString: today.toString(),
+    console.log('Check-meals date debug (BD timezone):', {
+      serverTimeUTC: now.toISOString(),
+      bdTime: bdTime.toISOString(),
       todayStr,
       normalizedToday: normalizedToday.toISOString(),
       normalizedTodayString: normalizedToday.toDateString()

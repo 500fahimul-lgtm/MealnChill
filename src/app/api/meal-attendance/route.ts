@@ -76,18 +76,18 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Parse the date string correctly for any timezone
-    // Use the ISO date string directly to avoid timezone issues
-    const [year, month, day] = dateParam.split('-').map(Number)
-    const normalizedDate = new Date(year, month - 1, day) // Local date construction
+    // Parse the date string for Bangladesh timezone (GMT+6)
+    // When frontend sends "2025-08-06", treat it as BD date, not UTC
+    const dateString = dateParam + 'T00:00:00+06:00' // Add BD timezone offset
+    const normalizedDate = new Date(dateString)
     
     console.log('Date processing debug (BD timezone):', {
       dateParam,
-      parsedComponents: { year, month, day },
-      normalizedDateISO: normalizedDate.toISOString(),
-      normalizedDateString: normalizedDate.toDateString(),
-      serverCurrentDate: new Date().toDateString(),
-      isMatchingToday: normalizedDate.toDateString() === new Date().toDateString()
+      dateStringWithTZ: dateString,
+      normalizedDate: normalizedDate.toISOString(),
+      normalizedDateUTC: normalizedDate.toUTCString(),
+      serverCurrentUTC: new Date().toUTCString(),
+      serverCurrentLocal: new Date().toString()
     })
 
     // Determine which user's data to fetch
