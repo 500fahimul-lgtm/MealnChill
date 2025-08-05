@@ -8,15 +8,12 @@ import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
-  console.log('=== MEAL ATTENDANCE API CALLED ===')
   try {
     await connectDB()
-    console.log('Database connected successfully')
 
     // Get token from Authorization header
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
-      console.log('No token provided in request')
       return NextResponse.json(
         { message: 'No token provided' },
         { status: 401 }
@@ -47,11 +44,6 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const dateParam = searchParams.get('date')
-    console.log('Request parameters:', { 
-      dateParam, 
-      url: req.url,
-      allParams: Object.fromEntries(searchParams.entries())
-    })
     const targetUserId = searchParams.get('targetUserId') // For admin to fetch specific user data
     const startDateParam = searchParams.get('startDate')
     const endDateParam = searchParams.get('endDate')
@@ -59,19 +51,10 @@ export async function GET(req: NextRequest) {
 
     // Handle date range query for dashboard stats
     if (startDateParam && endDateParam && fetchUserId) {
-      console.log('Date range query detected:', { startDateParam, endDateParam, fetchUserId })
-      
       try {
         // Parse the dates directly as they come from frontend (already in proper format)
         const startDate = new Date(startDateParam)
         const endDate = new Date(endDateParam)
-        
-        console.log('Parsed date range:', {
-          startDate: startDate.toISOString(),
-          endDate: endDate.toISOString(),
-          messId: user.messId._id.toString(),
-          userId: fetchUserId
-        })
         
         const attendance = await MealAttendance.find({
           messId: user.messId._id,
@@ -81,8 +64,6 @@ export async function GET(req: NextRequest) {
             $lte: endDate
           }
         }).sort({ date: 1, mealSlot: 1 })
-
-        console.log('Found attendance records:', attendance.length)
 
         return NextResponse.json({
           success: true,
@@ -98,23 +79,16 @@ export async function GET(req: NextRequest) {
     }
 
     if (!dateParam) {
-      console.log('No date parameter provided')
       return NextResponse.json(
         { message: 'Date is required' },
         { status: 400 }
       )
     }
 
-    console.log('Processing date parameter:', dateParam)
-    console.log('Current server time:', new Date().toISOString())
-    console.log('Current Bangladesh time:', new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }))
-    
     // Parse the date string for Bangladesh timezone (GMT+6)
     // When frontend sends "2025-08-06", treat it as BD date, not UTC
     const dateString = dateParam + 'T00:00:00+06:00' // Add BD timezone offset
     const normalizedDate = new Date(dateString)
-    console.log('Normalized date:', normalizedDate.toISOString())
-    console.log('Normalized date in BD timezone:', normalizedDate.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }))
 
     // Determine which user's data to fetch
     let targetUserIdToFetch = userId // Default to logged-in user
@@ -157,30 +131,10 @@ export async function GET(req: NextRequest) {
     const utcDateString = dateParam + 'T00:00:00.000Z' // UTC timezone  
     const utcDate = new Date(utcDateString)
     
-    console.log('Trying multiple date formats:', {
-      bdDate: bdDate.toISOString(),
-      utcDate: utcDate.toISOString()
-    })
-    
     const mealRoutines = await MealRoutine.find({
       messId: user.messId,
       date: { $in: [bdDate, utcDate] }, // Look for either date format
       isActive: true
-    })
-    
-    // Debug: Check what meal routines we found
-    console.log('Meal Attendance Debug:', {
-      dateParam,
-      normalizedDate: normalizedDate.toISOString(),
-      messId: user.messId._id.toString(),
-      foundRoutines: mealRoutines.map(r => ({
-        id: r._id.toString(),
-        date: r.date.toISOString(),
-        mealSlot: r.mealSlot,
-        mealName: r.mealName,
-        isActive: r.isActive
-      })),
-      totalRoutinesFound: mealRoutines.length
     })
 
     // Get mess meal frequency to determine available slots

@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const userId = decoded.userId
 
-    console.log(`DEBUG: User ${userId} requesting meal preparation`)
+
 
     // Get user to check admin status
     const user = await User.findById(userId)
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
       })
       
       await mealRoutine.save()
-      console.log(`DEBUG: Created default meal routine for ${mealSlot} on ${date}`)
+
     }
 
     // Check if meal is already prepared
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     
     const activeMembers = messData.members.filter((member: any) => member.isActive)
     
-    console.log(`DEBUG: Found ${activeMembers.length} active members`)
+
 
     // Ensure ALL active members have attendance records for this meal slot
     // This fixes the issue where members without records don't get counted properly
@@ -170,15 +170,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'No meals to prepare for this slot' }, { status: 400 })
     }
 
-    console.log(`DEBUG: Processing ${inventoryItems.length} custom inventory items`)
-    console.log(`DEBUG: Received inventory items:`, JSON.stringify(inventoryItems, null, 2))
+
+
 
     // Process custom inventory items selected by admin
     const inventoryResults = []
     for (const customItem of inventoryItems) {
       try {
         // Find inventory item by ID
-        console.log(`DEBUG: Looking for inventory item with ID: ${customItem.itemId} in mess: ${messId}`)
+
         
         // Validate ObjectId format
         if (!customItem.itemId || !customItem.itemId.match(/^[0-9a-fA-F]{24}$/)) {
@@ -194,17 +194,17 @@ export async function POST(req: NextRequest) {
           _id: customItem.itemId
         })
         
-        console.log(`DEBUG: Found inventory item:`, inventoryItem ? inventoryItem.itemName : 'NOT FOUND')
+
         if (inventoryItem && inventoryItem.messId.toString() !== messId.toString()) {
-          console.log(`DEBUG: Item has different messId. Item messId: ${inventoryItem.messId}, Expected messId: ${messId}`)
-          console.log(`DEBUG: Updating item messId to match current user's mess`)
+
+
           // Update the messId to match the current user's mess
           inventoryItem.messId = messId
         }
 
         if (inventoryItem) {
           const quantityToDeduct = parseQuantity(customItem.quantityToDeduct)
-          console.log(`DEBUG: Processing ${inventoryItem.itemName}: current=${inventoryItem.quantity}, toDeduct=${quantityToDeduct}, type=${typeof quantityToDeduct}`)
+
           
           if (isNaN(quantityToDeduct) || quantityToDeduct <= 0) {
             console.log(`ERROR: Invalid quantity to deduct: ${customItem.quantityToDeduct}`)
@@ -231,12 +231,12 @@ export async function POST(req: NextRequest) {
             inventoryItem.lastUpdated = new Date()
             inventoryItem.updatedByUserId = userId
             
-            console.log(`DEBUG: About to save inventory item. New quantity: ${inventoryItem.quantity}`)
+
             await inventoryItem.save()
-            console.log(`DEBUG: Successfully saved inventory item ${inventoryItem.itemName}`)
+
             
             // Log the inventory change
-            console.log(`DEBUG: About to log inventory change`)
+
             await logInventoryChange({
               messId,
               inventoryItemId: inventoryItem._id.toString(),
@@ -249,7 +249,7 @@ export async function POST(req: NextRequest) {
               reason: `Meal preparation: ${mealSlot} for ${totalMeals} meals (${standardMeals} standard, ${extraMeals} extra)`,
               performedBy: userId
             })
-            console.log(`DEBUG: Successfully logged inventory change`)
+
             
             inventoryResults.push({
               item: inventoryItem.itemName,
@@ -259,7 +259,7 @@ export async function POST(req: NextRequest) {
               unit: inventoryItem.unit
             })
             
-            console.log(`DEBUG: Deducted ${quantityToDeduct} ${inventoryItem.unit} of ${inventoryItem.itemName}. Remaining: ${inventoryItem.quantity}`)
+
           }
         } else {
           console.log(`WARNING: Inventory item with ID ${customItem.itemId} not found`)
@@ -301,13 +301,13 @@ export async function POST(req: NextRequest) {
         }
       })
       await notification.save()
-      console.log(`DEBUG: Notification created for meal served: ${mealSlot}`)
+
     } catch (notificationError) {
       console.error('ERROR: Failed to create notification for meal served:', notificationError)
       // Don't fail the main operation if notification creation fails
     }
 
-    console.log(`DEBUG: Meal ${mealSlot} marked as prepared successfully`)
+
 
     return NextResponse.json({
       message: 'Meal marked as prepared successfully',
@@ -344,7 +344,7 @@ export async function DELETE(req: NextRequest) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
     const userId = decoded.userId
 
-    console.log(`DEBUG: User ${userId} requesting meal undone`)
+
 
     // Get user to check admin status
     const user = await User.findById(userId)
@@ -367,7 +367,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ message: 'User is not part of any mess' }, { status: 400 })
     }
 
-    console.log(`DEBUG: Processing meal undone for ${mealSlot} on ${date}`)
+
 
     // Parse date to ensure proper format
     const mealDate = new Date(date)
@@ -400,7 +400,7 @@ export async function DELETE(req: NextRequest) {
     const standardMeals = attendanceData.filter(a => !a.extraMealCount || a.extraMealCount === 0).length
     const extraMeals = attendanceData.reduce((sum, a) => sum + (a.extraMealCount || 0), 0)
     const totalMeals = standardMeals + extraMeals
-    console.log(`DEBUG: Current attendance shows ${totalMeals} meals (${standardMeals} standard, ${extraMeals} extra)`)
+
 
     // Get the inventory deduction records for this meal preparation
     // Look for any records matching the meal slot and date pattern
@@ -413,7 +413,7 @@ export async function DELETE(req: NextRequest) {
       }
     }).sort({ timestamp: -1 })
 
-    console.log(`DEBUG: Found ${deductionRecords.length} deduction records for ${mealSlot} on ${date}`)
+
     
     // If we found deduction records, extract the meal count from the reason
     let originalTotalMeals = totalMeals
@@ -421,13 +421,13 @@ export async function DELETE(req: NextRequest) {
       const reasonMatch = deductionRecords[0].reason.match(/for (\d+) meals/)
       if (reasonMatch) {
         originalTotalMeals = parseInt(reasonMatch[1])
-        console.log(`DEBUG: Extracted original meal count from deduction record: ${originalTotalMeals}`)
+
       }
     }
     
-    console.log(`DEBUG: Restoring inventory for ${originalTotalMeals} meals (using original meal count from deduction records)`)
 
-    console.log(`DEBUG: Found ${deductionRecords.length} deduction records to restore`)
+
+
 
     // Check if any of these deductions have already been restored
     const restorationRecords = await InventoryRecord.find({
@@ -447,10 +447,10 @@ export async function DELETE(req: NextRequest) {
       )
     })
 
-    console.log(`DEBUG: Found ${unrestoredDeductions.length} unrestored deduction records`)
+
 
     if (unrestoredDeductions.length === 0) {
-      console.log('DEBUG: All deductions for this meal have already been restored')
+
     }
 
     // Restore inventory items based on the unrestored deduction records
@@ -465,7 +465,7 @@ export async function DELETE(req: NextRequest) {
         if (inventoryItem) {
           // Update messId to current user's mess if it's different
           if (inventoryItem.messId.toString() !== messId.toString()) {
-            console.log(`DEBUG: Updating restoration item messId from ${inventoryItem.messId} to ${messId}`)
+
             inventoryItem.messId = messId
           }
           
@@ -500,7 +500,7 @@ export async function DELETE(req: NextRequest) {
             unit: inventoryItem.unit
           })
           
-          console.log(`DEBUG: Restored ${quantityToRestore} ${inventoryItem.unit} of ${inventoryItem.itemName}. New total: ${inventoryItem.quantity}`)
+
         } else {
           console.log(`WARNING: Inventory item with ID ${record.inventoryItemId} not found for restoration`)
           inventoryResults.push({
@@ -542,13 +542,13 @@ export async function DELETE(req: NextRequest) {
         }
       })
       await notification.save()
-      console.log(`DEBUG: Notification created for meal undone: ${mealSlot}`)
+
     } catch (notificationError) {
       console.error('ERROR: Failed to create notification for meal undone:', notificationError)
       // Don't fail the main operation if notification creation fails
     }
 
-    console.log(`DEBUG: Meal ${mealSlot} marked as undone successfully`)
+
 
     return NextResponse.json({
       message: 'Meal marked as undone successfully',
