@@ -51,8 +51,11 @@ export async function GET(req: NextRequest) {
 
     // Handle date range query for dashboard stats
     if (startDateParam && endDateParam && fetchUserId) {
-      const startDate = new Date(startDateParam)
-      const endDate = new Date(endDateParam)
+      // Use Bangladesh timezone for date range as well
+      const startDateString = startDateParam + 'T00:00:00+06:00'
+      const endDateString = endDateParam + 'T23:59:59+06:00'
+      const startDate = new Date(startDateString)
+      const endDate = new Date(endDateString)
       
       const attendance = await MealAttendance.find({
         messId: user.messId._id,
@@ -121,6 +124,21 @@ export async function GET(req: NextRequest) {
       messId: user.messId,
       date: normalizedDate,
       isActive: true
+    })
+    
+    // Debug: Check what meal routines we found
+    console.log('Meal Attendance Debug:', {
+      dateParam,
+      normalizedDate: normalizedDate.toISOString(),
+      messId: user.messId._id.toString(),
+      foundRoutines: mealRoutines.map(r => ({
+        id: r._id.toString(),
+        date: r.date.toISOString(),
+        mealSlot: r.mealSlot,
+        mealName: r.mealName,
+        isActive: r.isActive
+      })),
+      totalRoutinesFound: mealRoutines.length
     })
 
     // Get mess meal frequency to determine available slots
