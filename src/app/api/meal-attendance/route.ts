@@ -80,15 +80,6 @@ export async function GET(req: NextRequest) {
     // When frontend sends "2025-08-06", treat it as BD date, not UTC
     const dateString = dateParam + 'T00:00:00+06:00' // Add BD timezone offset
     const normalizedDate = new Date(dateString)
-    
-    console.log('Date processing debug (BD timezone):', {
-      dateParam,
-      dateStringWithTZ: dateString,
-      normalizedDate: normalizedDate.toISOString(),
-      normalizedDateUTC: normalizedDate.toUTCString(),
-      serverCurrentUTC: new Date().toUTCString(),
-      serverCurrentLocal: new Date().toString()
-    })
 
     // Determine which user's data to fetch
     let targetUserIdToFetch = userId // Default to logged-in user
