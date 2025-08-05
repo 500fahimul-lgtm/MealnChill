@@ -40,6 +40,14 @@ export async function GET(req: NextRequest) {
     const todayStr = today.toISOString().split('T')[0]
     // Use local date to avoid timezone issues
     const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    
+    console.log('Check-meals date debug:', {
+      serverTime: today.toISOString(),
+      serverTimeString: today.toString(),
+      todayStr,
+      normalizedToday: normalizedToday.toISOString(),
+      normalizedTodayString: normalizedToday.toDateString()
+    })
 
     // Get today's routines specifically
     const todaysRoutines = await MealRoutine.find({

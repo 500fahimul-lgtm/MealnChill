@@ -76,15 +76,18 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    // Parse the date string correctly to avoid timezone issues
+    // Parse the date string correctly for any timezone
+    // Use the ISO date string directly to avoid timezone issues
     const [year, month, day] = dateParam.split('-').map(Number)
-    const normalizedDate = new Date(year, month - 1, day) // month is 0-indexed
+    const normalizedDate = new Date(year, month - 1, day) // Local date construction
     
-    console.log('Date processing debug:', {
+    console.log('Date processing debug (BD timezone):', {
       dateParam,
       parsedComponents: { year, month, day },
-      normalizedDate: normalizedDate.toISOString(),
-      normalizedDateLocal: normalizedDate.toLocaleDateString()
+      normalizedDateISO: normalizedDate.toISOString(),
+      normalizedDateString: normalizedDate.toDateString(),
+      serverCurrentDate: new Date().toDateString(),
+      isMatchingToday: normalizedDate.toDateString() === new Date().toDateString()
     })
 
     // Determine which user's data to fetch
