@@ -286,6 +286,7 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
+        body: JSON.stringify({ rejectionReason: 'Rejected by admin' }),
       })
 
       if (response.ok) {
@@ -323,7 +324,6 @@ export default function FinancialOverview({ messId, isAdmin }: FinancialOverview
         },
         body: JSON.stringify({
           amount: Number(depositAmount),
-          messId: messId,
         }),
       })
 

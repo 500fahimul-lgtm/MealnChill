@@ -24,15 +24,21 @@ export async function GET(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId) {
-      return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
+    if (!decoded || !decoded.userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Get user to find their mess
+    const user = await User.findById(decoded.userId)
+    if (!user || !user.messId) {
+      return NextResponse.json({ message: 'User not found or not in a mess' }, { status: 404 })
     }
 
     const url = new URL(request.url)
     const status = url.searchParams.get('status') // 'pending', 'approved', 'rejected', or null for all
 
     // Build filter
-    const filter: any = { messId: decoded.messId }
+    const filter: any = { messId: user.messId }
     if (status) {
       filter.status = status
     }
@@ -47,7 +53,7 @@ export async function GET(request: NextRequest) {
     const totalApprovedDeposits = await Deposit.aggregate([
       {
         $match: {
-          messId: decoded.messId,
+          messId: user.messId,
           status: 'approved'
         }
       },
@@ -60,11 +66,11 @@ export async function GET(request: NextRequest) {
     ])
 
     // Get current mess info for total deposited amount in current cycle
-    const mess = await Mess.findById(decoded.messId)
+    const mess = await Mess.findById(user.messId)
 
     // Get pending deposits count for UI notification
     const pendingCount = await Deposit.countDocuments({
-      messId: decoded.messId,
+      messId: user.messId,
       status: 'pending'
     })
 
@@ -90,8 +96,14 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId) {
-      return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
+    if (!decoded || !decoded.userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Get user to find their mess
+    const currentUser = await User.findById(decoded.userId)
+    if (!currentUser || !currentUser.messId) {
+      return NextResponse.json({ message: 'User not found or not in a mess' }, { status: 404 })
     }
 
     const { userId, amount, date, note, isDirectEntry } = await request.json()
@@ -103,7 +115,7 @@ export async function POST(request: NextRequest) {
 
     // If userId is provided, verify user belongs to the mess
     let targetUserId = userId || decoded.userId
-    const user = await User.findOne({ _id: targetUserId, messId: decoded.messId })
+    const user = await User.findOne({ _id: targetUserId, messId: currentUser.messId })
     if (!user) {
       return NextResponse.json({ message: 'User not found in this mess' }, { status: 404 })
     }
@@ -112,11 +124,11 @@ export async function POST(request: NextRequest) {
     let status = 'pending'
     let approvedByUserId = null
 
-    if (isDirectEntry && decoded.isAdmin) {
+    if (isDirectEntry && currentUser.isAdmin) {
       // Admin direct entry - automatically approved
       status = 'approved'
       approvedByUserId = decoded.userId
-    } else if (decoded.isAdmin && userId && userId !== decoded.userId) {
+    } else if (currentUser.isAdmin && userId && userId !== decoded.userId) {
       // Admin adding deposit for another member - automatically approved
       status = 'approved'
       approvedByUserId = decoded.userId
@@ -124,7 +136,7 @@ export async function POST(request: NextRequest) {
     // Regular member submissions remain pending
 
     const deposit = new Deposit({
-      messId: decoded.messId,
+      messId: currentUser.messId,
       userId: targetUserId,
       amount: parseFloat(amount),
       date: date ? new Date(date) : new Date(),
@@ -138,7 +150,7 @@ export async function POST(request: NextRequest) {
     // If approved immediately, update mess total deposited amount
     if (status === 'approved') {
       await Mess.findByIdAndUpdate(
-        decoded.messId,
+        currentUser.messId,
         { $inc: { totalDepositedAmountCurrentCycle: deposit.amount } }
       )
     }

@@ -47,7 +47,16 @@ export async function PUT(
     // Await params in Next.js 15
     const awaitedParams = await params
     const depositId = awaitedParams.id
-    const { rejectionReason } = await request.json()
+    
+    // Handle request body safely - it might be empty
+    let rejectionReason = 'No reason provided'
+    try {
+      const body = await request.json()
+      rejectionReason = body.rejectionReason || 'No reason provided'
+    } catch (error) {
+      // No body or invalid JSON - use default reason
+      rejectionReason = 'No reason provided'
+    }
 
     const deposit = await Deposit.findOne({ 
       _id: depositId, 
