@@ -8,12 +8,15 @@ import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest) {
+  console.log('=== MEAL ATTENDANCE API CALLED ===')
   try {
     await connectDB()
+    console.log('Database connected successfully')
 
     // Get token from Authorization header
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
+      console.log('No token provided in request')
       return NextResponse.json(
         { message: 'No token provided' },
         { status: 401 }
@@ -44,6 +47,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const dateParam = searchParams.get('date')
+    console.log('Request parameters:', { dateParam, url: req.url })
     const targetUserId = searchParams.get('targetUserId') // For admin to fetch specific user data
     const startDateParam = searchParams.get('startDate')
     const endDateParam = searchParams.get('endDate')
@@ -73,16 +77,19 @@ export async function GET(req: NextRequest) {
     }
 
     if (!dateParam) {
+      console.log('No date parameter provided')
       return NextResponse.json(
         { message: 'Date is required' },
         { status: 400 }
       )
     }
 
+    console.log('Processing date parameter:', dateParam)
     // Parse the date string for Bangladesh timezone (GMT+6)
     // When frontend sends "2025-08-06", treat it as BD date, not UTC
     const dateString = dateParam + 'T00:00:00+06:00' // Add BD timezone offset
     const normalizedDate = new Date(dateString)
+    console.log('Normalized date:', normalizedDate.toISOString())
 
     // Determine which user's data to fetch
     let targetUserIdToFetch = userId // Default to logged-in user
