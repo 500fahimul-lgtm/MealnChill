@@ -47,7 +47,11 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const dateParam = searchParams.get('date')
-    console.log('Request parameters:', { dateParam, url: req.url })
+    console.log('Request parameters:', { 
+      dateParam, 
+      url: req.url,
+      allParams: Object.fromEntries(searchParams.entries())
+    })
     const targetUserId = searchParams.get('targetUserId') // For admin to fetch specific user data
     const startDateParam = searchParams.get('startDate')
     const endDateParam = searchParams.get('endDate')
@@ -55,25 +59,42 @@ export async function GET(req: NextRequest) {
 
     // Handle date range query for dashboard stats
     if (startDateParam && endDateParam && fetchUserId) {
-      // Use Bangladesh timezone for date range as well
-      const startDateString = startDateParam + 'T00:00:00+06:00'
-      const endDateString = endDateParam + 'T23:59:59+06:00'
-      const startDate = new Date(startDateString)
-      const endDate = new Date(endDateString)
+      console.log('Date range query detected:', { startDateParam, endDateParam, fetchUserId })
       
-      const attendance = await MealAttendance.find({
-        messId: user.messId._id,
-        userId: fetchUserId,
-        date: {
-          $gte: startDate,
-          $lte: endDate
-        }
-      }).sort({ date: 1, slot: 1 })
+      try {
+        // Parse the dates directly as they come from frontend (already in proper format)
+        const startDate = new Date(startDateParam)
+        const endDate = new Date(endDateParam)
+        
+        console.log('Parsed date range:', {
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          messId: user.messId._id.toString(),
+          userId: fetchUserId
+        })
+        
+        const attendance = await MealAttendance.find({
+          messId: user.messId._id,
+          userId: fetchUserId,
+          date: {
+            $gte: startDate,
+            $lte: endDate
+          }
+        }).sort({ date: 1, mealSlot: 1 })
 
-      return NextResponse.json({
-        success: true,
-        attendance
-      })
+        console.log('Found attendance records:', attendance.length)
+
+        return NextResponse.json({
+          success: true,
+          attendance
+        })
+      } catch (dateRangeError) {
+        console.error('Date range query error:', dateRangeError)
+        return NextResponse.json(
+          { message: 'Error processing date range query', error: dateRangeError instanceof Error ? dateRangeError.message : 'Unknown error' },
+          { status: 500 }
+        )
+      }
     }
 
     if (!dateParam) {
