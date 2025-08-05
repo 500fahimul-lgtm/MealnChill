@@ -41,11 +41,15 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // Parse dates with Bangladesh timezone
+    const startDateString = startDate + 'T00:00:00+06:00'
+    const endDateString = endDate + 'T23:59:59+06:00'
+    
     const routines = await MealRoutine.find({
       messId: user.messId,
       date: {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: new Date(startDateString),
+        $lte: new Date(endDateString)
       },
       isActive: true
     }).sort({ date: 1, mealSlot: 1 })
@@ -141,16 +145,19 @@ export async function POST(req: NextRequest) {
       mealDescription
     })
 
-    // Update or create meal routine
+    // Update or create meal routine using Bangladesh timezone
+    const dateString = date + 'T00:00:00+06:00' // Add BD timezone offset
+    const normalizedDate = new Date(dateString)
+    
     const mealRoutine = await MealRoutine.findOneAndUpdate(
       {
         messId: user.messId,
-        date: new Date(date),
+        date: normalizedDate,
         mealSlot: mealSlot
       },
       {
         messId: user.messId,
-        date: new Date(date),
+        date: normalizedDate,
         mealSlot: mealSlot,
         mealName: mealName.trim(),
         mealDescription: mealDescription.trim(),

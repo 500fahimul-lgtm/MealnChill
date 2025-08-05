@@ -340,8 +340,9 @@ export async function POST(req: NextRequest) {
     
     const attendanceDate = new Date(date)
     
-    // Ensure we use the correct date format (YYYY-MM-DD as UTC date)
-    const normalizedDate = new Date(attendanceDate.getFullYear(), attendanceDate.getMonth(), attendanceDate.getDate())
+    // Use Bangladesh timezone parsing to match GET method
+    const dateString = date + 'T00:00:00+06:00' // Add BD timezone offset
+    const normalizedDate = new Date(dateString)
     
     // Only check deadline if not admin override and user is not admin
     const shouldCheckDeadline = !isAdminOverride && !currentUser?.isAdmin && requestDate.getTime() >= new Date().setHours(0, 0, 0, 0)
