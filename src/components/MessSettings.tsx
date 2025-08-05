@@ -70,6 +70,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
   const [searchTerm, setSearchTerm] = useState('')
   const [mealManagement, setMealManagement] = useState<{[key: string]: any}>({})
   const [expandedMealControls, setExpandedMealControls] = useState<{[key: string]: boolean}>({})
+  const [selectedMealDate, setSelectedMealDate] = useState<{[key: string]: string}>({}) // Store selected date for each member
   const [unsavedChanges, setUnsavedChanges] = useState<{[key: string]: boolean}>({})
   const [messStatus, setMessStatus] = useState<{
     messId: string
@@ -485,14 +486,13 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
     member.phone.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
 
-  const fetchMemberMealData = async (userId: string) => {
+  const fetchMemberMealData = async (userId: string, selectedDate?: string) => {
     try {
       const token = localStorage.getItem('token')
-      const today = new Date().toISOString().split('T')[0]
+      const dateToFetch = selectedDate || new Date().toISOString().split('T')[0]
       
       // For admin, we need to fetch data for a specific user
-      // We'll create a new API endpoint or modify the existing one
-      const response = await fetch(`/api/meal-attendance?date=${today}&targetUserId=${userId}`, {
+      const response = await fetch(`/api/meal-attendance?date=${dateToFetch}&targetUserId=${userId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
@@ -508,7 +508,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
         // Transform the userAttendance data to our expected format
         const transformedData: any = {
           userId,
-          date: today,
+          date: dateToFetch,
           breakfast: { status: 'off', extra: 0 },
           lunch: { status: 'off', extra: 0 },
           dinner: { status: 'off', extra: 0 }
@@ -546,10 +546,13 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
 
   const updateMemberMeal = async (userId: string, mealType: string, field: string, value: any) => {
     try {
+      // Get the selected date for this user, or default to today
+      const selectedDate = selectedMealDate[userId] || new Date().toISOString().split('T')[0]
+      
       // Update local state immediately for better UX
       const currentData = mealManagement[userId] || {
         userId,
-        date: new Date().toISOString().split('T')[0],
+        date: selectedDate,
         breakfast: { status: 'off', extra: 0 },
         lunch: { status: 'off', extra: 0 },
         dinner: { status: 'off', extra: 0 }
@@ -584,7 +587,8 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
   const saveMemberMealChanges = async (userId: string) => {
     try {
       const token = localStorage.getItem('token')
-      const today = new Date().toISOString().split('T')[0]
+      // Use the selected date for this user, or default to today
+      const selectedDate = selectedMealDate[userId] || new Date().toISOString().split('T')[0]
       
       const memberData = mealManagement[userId]
       if (!memberData) {
@@ -610,7 +614,7 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
           },
           body: JSON.stringify({
             targetUserId: userId, // For admin override
-            date: today,
+            date: selectedDate, // Use selected date instead of hardcoded today
             mealSlot: mealType,
             isMealOn,
             extraMealCount,
@@ -633,7 +637,14 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
         [userId]: false
       }))
       
-      showNotification('success', 'All meal changes saved successfully!')
+      // Format date for display
+      const displayDate = new Date(selectedDate).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      })
+      
+      showNotification('success', `All meal changes for ${displayDate} saved successfully!`)
       
     } catch (error) {
       showNotification('error', 'Error saving meal changes. Please try again.')
@@ -1258,7 +1269,13 @@ MessSettings Debug Info:
                               <button
                                 onClick={() => {
                                   if (!memberMealData) {
-                                    fetchMemberMealData(member.userId)
+                                    // Initialize with today's date if not set
+                                    const today = new Date().toISOString().split('T')[0]
+                                    setSelectedMealDate(prev => ({
+                                      ...prev,
+                                      [member.userId]: today
+                                    }))
+                                    fetchMemberMealData(member.userId, today)
                                   } else {
                                     // Toggle meal controls visibility
                                     setExpandedMealControls(prev => ({
@@ -1293,7 +1310,37 @@ MessSettings Debug Info:
                         {/* Meal Management Controls */}
                         {memberMealData && member.isActive && expandedMealControls[member.userId] && (
                           <div className="border-t pt-4">
-                            <h4 className="text-sm font-medium text-gray-700 mb-3">Today's Meal Management</h4>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-sm font-medium text-gray-700">
+                                Meal Management
+                                {selectedMealDate[member.userId] && (
+                                  <span className="ml-2 text-xs text-blue-600 font-normal">
+                                    ({new Date(selectedMealDate[member.userId]).toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      year: 'numeric'
+                                    })})
+                                  </span>
+                                )}
+                              </h4>
+                              <div className="flex items-center space-x-2">
+                                <CalendarToday className="w-4 h-4 text-gray-500" />
+                                <input
+                                  type="date"
+                                  value={selectedMealDate[member.userId] || new Date().toISOString().split('T')[0]}
+                                  onChange={(e) => {
+                                    const newDate = e.target.value
+                                    setSelectedMealDate(prev => ({
+                                      ...prev,
+                                      [member.userId]: newDate
+                                    }))
+                                    // Fetch meal data for the new date
+                                    fetchMemberMealData(member.userId, newDate)
+                                  }}
+                                  className="text-xs p-1 border border-gray-300 rounded focus:ring-1 focus:ring-primary-500 text-gray-900 bg-white"
+                                />
+                              </div>
+                            </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                               {/* Breakfast (if 3 meals) */}
                               {messData.mealFrequency === 3 && (
