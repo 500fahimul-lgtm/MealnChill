@@ -109,20 +109,12 @@ export async function GET(req: NextRequest) {
       targetUserIdToFetch = targetUserId
     }
 
-    console.log('Fetching meal attendance for userId:', targetUserIdToFetch, 'date:', dateParam)
-
     // Get user's attendance for the day
     const userAttendance = await MealAttendance.find({
       userId: targetUserIdToFetch,
       messId: user.messId,
       date: normalizedDate
     })
-
-    console.log('Found attendance records:', userAttendance.map(a => ({
-      mealSlot: a.mealSlot,
-      isMealOn: a.isMealOn,
-      extraMealCount: a.extraMealCount
-    })))
 
     // Get meal routines for the day to show meal names
     const mealRoutines = await MealRoutine.find({
@@ -156,35 +148,12 @@ export async function GET(req: NextRequest) {
       date: normalizedDate
     })
 
-    console.log(`DEBUG - All attendance records for ${dateParam}:`, allAttendance.map(a => ({
-      userId: a.userId.toString(),
-      mealSlot: a.mealSlot,
-      isMealOn: a.isMealOn,
-      extraMealCount: a.extraMealCount
-    })))
-
     // Get all active mess members
     const messInfo2 = user.messId
     const activeMembers = messInfo2.members.filter((member: any) => member.isActive)
-    
-    console.log(`DEBUG - Active members:`, activeMembers.map((m: any) => ({
-      userId: m.userId.toString(),
-      name: m.name || 'Unknown'
-    })))
 
     const mealSummary = mealSlots.map(slot => {
       const slotAttendance = allAttendance.filter(a => a.mealSlot === slot)
-      
-      console.log(`DEBUG - ${slot} slot attendance records:`, slotAttendance.map(a => ({
-        userId: a.userId.toString(),
-        isMealOn: a.isMealOn,
-        extraMealCount: a.extraMealCount
-      })))
-      
-      console.log(`DEBUG - ${slot} active members:`, activeMembers.map((m: any) => ({
-        userId: m.userId.toString(),
-        name: m.name || 'Unknown'
-      })))
       
       // For each member, determine their attendance status
       let totalStandardMeals = 0
@@ -198,32 +167,19 @@ export async function GET(req: NextRequest) {
           return attendanceUserId === memberUserId
         })
         
-        console.log(`DEBUG - ${slot} - Member ${member.userId} (${member.name || 'Unknown'}):`, {
-          hasRecord: !!memberAttendance,
-          isMealOn: memberAttendance?.isMealOn,
-          extraMealCount: memberAttendance?.extraMealCount
-        })
-        
         if (memberAttendance) {
           // User has explicit attendance record
           if (memberAttendance.isMealOn) {
             totalStandardMeals++ // Count as standard meal if meal is on
-            console.log(`  → Counting as standard meal (isMealOn: true)`)
-          } else {
-            console.log(`  → NOT counting as standard meal (isMealOn: false)`)
           }
           if (memberAttendance.extraMealCount > 0) {
             totalExtraMeals += memberAttendance.extraMealCount // Add the number of extra meals
-            console.log(`  → Counting ${memberAttendance.extraMealCount} extra meal(s)`)
           }
         } else {
           // User has no record, default to meal on (standard meal)
           totalStandardMeals++
-          console.log(`  → No record found, defaulting to standard meal`)
         }
       })
-      
-      console.log(`DEBUG - ${slot} totals: standard=${totalStandardMeals}, extra=${totalExtraMeals}`)
       
       const routine = mealRoutines.find(r => r.mealSlot === slot)
 
@@ -327,16 +283,6 @@ export async function POST(req: NextRequest) {
     }
 
     const { date, mealSlot, isMealOn, extraMealCount, targetUserId, isAdminOverride } = await req.json()
-
-    console.log(`DEBUG: POST /api/meal-attendance received:`, {
-      date,
-      mealSlot,
-      isMealOn,
-      extraMealCount,
-      userId,
-      targetUserId,
-      isAdminOverride
-    })
 
     // Validate required fields
     if (!date || !mealSlot) {
@@ -488,8 +434,6 @@ export async function POST(req: NextRequest) {
         new: true 
       }
     )
-
-    console.log(`DEBUG: Updated attendance record:`, attendance)
 
     // Create notifications for attendance changes (use the actual user who made the change)
     const mealSlotName = mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)
