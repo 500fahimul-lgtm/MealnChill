@@ -5,35 +5,24 @@ import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const startTime = Date.now()
-  console.log(`[MessAPI] GET request started at ${new Date().toISOString()}`)
-  
   try {
-    // Enhanced connection with timeout
-    console.log(`[MessAPI] Attempting database connection...`)
-    const connectStart = Date.now()
     await connectDB()
-    console.log(`[MessAPI] Database connected in ${Date.now() - connectStart}ms`)
 
     // Get token from Authorization header
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
     
     if (!token) {
-      console.log(`[MessAPI] No token provided`)
       return NextResponse.json(
         { message: 'No token provided' },
         { status: 401 }
       )
     }
 
-    // Verify token with enhanced error handling
+    // Verify token
     let decoded: any
     try {
-      console.log(`[MessAPI] Verifying JWT token...`)
       decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
-      console.log(`[MessAPI] Token verified for user: ${decoded.userId}`)
     } catch (jwtError) {
-      console.error(`[MessAPI] JWT verification failed:`, jwtError)
       return NextResponse.json(
         { message: 'Invalid or expired token' },
         { status: 401 }
@@ -44,51 +33,38 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     const resolvedParams = await params
     const messId = resolvedParams.id
-    console.log(`[MessAPI] Processing request for mess ID: ${messId}`)
 
     // Validate messId format (MongoDB ObjectId)
     if (!messId || !messId.match(/^[0-9a-fA-F]{24}$/)) {
-      console.log(`[MessAPI] Invalid mess ID format: ${messId}`)
       return NextResponse.json(
         { message: 'Invalid mess ID format' },
         { status: 400 }
       )
     }
 
-    // Get user to verify they belong to this mess with timeout
-    console.log(`[MessAPI] Finding user: ${userId}`)
-    const userStart = Date.now()
-    const user = await User.findById(userId).maxTimeMS(5000) // 5 second timeout
-    console.log(`[MessAPI] User query completed in ${Date.now() - userStart}ms`)
+    // Get user to verify they belong to this mess
+    const user = await User.findById(userId).maxTimeMS(5000)
     
     if (!user || !user.messId || user.messId.toString() !== messId) {
-      console.log(`[MessAPI] Access denied - User: ${!!user}, MessId match: ${user?.messId?.toString() === messId}`)
       return NextResponse.json(
         { message: 'Access denied - User not found or not member of this mess' },
         { status: 403 }
       )
     }
 
-    // Get mess data with populated member details - Enhanced with timeout and error handling
-    console.log(`[MessAPI] Fetching mess data with populated fields...`)
-    const messStart = Date.now()
+    // Get mess data with populated member details
     const mess = await Mess.findById(messId)
       .populate('members.userId', 'name email phone isAdmin')
       .populate('adminId', 'name email phone isAdmin')
       .populate('adminIds', 'name email phone isAdmin')
       .maxTimeMS(10000) // 10 second timeout for complex populate
     
-    console.log(`[MessAPI] Mess query completed in ${Date.now() - messStart}ms`)
-    
     if (!mess) {
-      console.log(`[MessAPI] Mess not found for ID: ${messId}`)
       return NextResponse.json(
         { message: 'Mess not found' },
         { status: 404 }
       )
     }
-
-    console.log(`[MessAPI] Found mess: ${mess.name} with ${mess.members?.length || 0} members`)
 
     // Check if user is admin
     const isAdmin = mess.adminIds?.some((adminId: any) => adminId._id.toString() === userId) ||
@@ -104,11 +80,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Create a comprehensive member list including all admins and members
     const allMembers: any[] = []
     
-    console.log(`[MessAPI] Processing admin and member data...`)
-    
     // Add main admin (with null check)
     if (mess.adminId && mess.adminId._id) {
-      console.log(`[MessAPI] Adding main admin: ${mess.adminId.name}`)
       allMembers.push({
         userId: mess.adminId._id,
         name: mess.adminId.name,
@@ -119,21 +92,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         joinedAt: mess.createdAt || new Date(),
         isPending: false
       })
-    } else {
-      console.log(`[MessAPI] Warning: Main admin is null or missing _id`)
     }
     
     // Add additional admins (if they're not the main admin)
     if (mess.adminIds && mess.adminIds.length > 0) {
-      console.log(`[MessAPI] Processing ${mess.adminIds.length} additional admins`)
-      mess.adminIds.forEach((admin: any, index: number) => {
+      mess.adminIds.forEach((admin: any) => {
         if (!admin || !admin._id) {
-          console.log(`[MessAPI] Warning: Admin at index ${index} is null or missing _id`)
           return // Skip this admin
         }
         
         if (mess.adminId && mess.adminId._id && admin._id.toString() !== mess.adminId._id.toString()) {
-          console.log(`[MessAPI] Adding additional admin: ${admin.name}`)
           allMembers.push({
             userId: admin._id,
             name: admin.name,
@@ -149,11 +117,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     }
     
     // Add regular members (with comprehensive null checks)
-    console.log(`[MessAPI] Processing ${mess.members?.length || 0} regular members`)
     if (mess.members && mess.members.length > 0) {
-      mess.members.forEach((member: any, index: number) => {
+      mess.members.forEach((member: any) => {
         if (!member || !member.userId || !member.userId._id) {
-          console.log(`[MessAPI] Warning: Member at index ${index} is null or userId is null`)
           return // Skip this member
         }
         
@@ -164,7 +130,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
           })
           
           if (!isAlreadyAdmin) {
-            console.log(`[MessAPI] Adding member: ${member.userId.name || 'Unknown'}`)
             allMembers.push({
               userId: member.userId._id,
               name: member.userId.name || 'Unknown',
@@ -175,16 +140,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
               joinedAt: member.joinedAt,
               isPending: !member.isActive
             })
-          } else {
-            console.log(`[MessAPI] Skipping member ${member.userId.name} (already added as admin)`)
           }
         } catch (memberError) {
-          console.error(`[MessAPI] Error processing member at index ${index}:`, memberError)
+          // Skip member with error
+          console.error(`Error processing member:`, memberError)
         }
       })
     }
-
-    console.log(`[MessAPI] Successfully processed ${allMembers.length} total members`)
 
     // Format the response data
     const messData = {
@@ -197,18 +159,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       members: allMembers
     }
 
-    console.log(`[MessAPI] Successfully processed mess data in ${Date.now() - startTime}ms`)
     return NextResponse.json({ mess: messData })
   } catch (error) {
-    const duration = Date.now() - startTime
-    console.error(`[MessAPI] Error after ${duration}ms:`, error)
-    
-    // Enhanced error logging for debugging
-    if (error instanceof Error) {
-      console.error(`[MessAPI] Error name: ${error.name}`)
-      console.error(`[MessAPI] Error message: ${error.message}`)
-      console.error(`[MessAPI] Error stack: ${error.stack?.substring(0, 500)}`)
-    }
+    console.error(`[MessAPI] Error:`, error)
     
     // Check for specific MongoDB errors
     let errorMessage = 'Internal server error'
@@ -217,26 +170,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (error instanceof Error) {
       if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
         errorMessage = 'Database operation timed out - server may be overloaded'
-        console.error(`[MessAPI] Database timeout detected`)
       } else if (error.message.includes('connection') || error.message.includes('CONNECTION')) {
         errorMessage = 'Database connection failed - please try again'
-        console.error(`[MessAPI] Database connection error detected`)
       } else if (error.message.includes('JWT') || error.message.includes('token')) {
         errorMessage = 'Authentication error'
         statusCode = 401
-        console.error(`[MessAPI] JWT/Token error detected`)
       }
     }
     
     return NextResponse.json(
-      { 
-        message: errorMessage,
-        debug: process.env.NODE_ENV === 'development' ? {
-          error: error instanceof Error ? error.message : 'Unknown error',
-          duration: `${duration}ms`,
-          timestamp: new Date().toISOString()
-        } : undefined
-      },
+      { message: errorMessage },
       { status: statusCode }
     )
   }
