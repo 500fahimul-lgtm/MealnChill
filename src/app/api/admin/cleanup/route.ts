@@ -79,10 +79,6 @@ export async function POST(request: NextRequest) {
         sum + (result.deletedCount || 0), 0
       )
 
-      // Log the cleanup action
-      console.log(`Database cleanup performed by admin: ${admin.username}`)
-      console.log('Deletion results:', deletionResults)
-
       return NextResponse.json({
         message: 'Database cleanup completed successfully',
         details: {
