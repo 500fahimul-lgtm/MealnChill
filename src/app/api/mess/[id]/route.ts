@@ -104,8 +104,11 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     // Create a comprehensive member list including all admins and members
     const allMembers: any[] = []
     
-    // Add main admin
-    if (mess.adminId) {
+    console.log(`[MessAPI] Processing admin and member data...`)
+    
+    // Add main admin (with null check)
+    if (mess.adminId && mess.adminId._id) {
+      console.log(`[MessAPI] Adding main admin: ${mess.adminId.name}`)
       allMembers.push({
         userId: mess.adminId._id,
         name: mess.adminId.name,
@@ -116,12 +119,21 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         joinedAt: mess.createdAt || new Date(),
         isPending: false
       })
+    } else {
+      console.log(`[MessAPI] Warning: Main admin is null or missing _id`)
     }
     
     // Add additional admins (if they're not the main admin)
     if (mess.adminIds && mess.adminIds.length > 0) {
-      mess.adminIds.forEach((admin: any) => {
-        if (admin._id.toString() !== mess.adminId._id.toString()) {
+      console.log(`[MessAPI] Processing ${mess.adminIds.length} additional admins`)
+      mess.adminIds.forEach((admin: any, index: number) => {
+        if (!admin || !admin._id) {
+          console.log(`[MessAPI] Warning: Admin at index ${index} is null or missing _id`)
+          return // Skip this admin
+        }
+        
+        if (mess.adminId && mess.adminId._id && admin._id.toString() !== mess.adminId._id.toString()) {
+          console.log(`[MessAPI] Adding additional admin: ${admin.name}`)
           allMembers.push({
             userId: admin._id,
             name: admin.name,
@@ -136,23 +148,43 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       })
     }
     
-    // Add regular members
-    mess.members.forEach((member: any) => {
-      // Skip if this user is already added as an admin
-      const isAlreadyAdmin = allMembers.some(m => m.userId.toString() === member.userId._id.toString())
-      if (!isAlreadyAdmin) {
-        allMembers.push({
-          userId: member.userId._id,
-          name: member.userId.name,
-          email: member.userId.email,
-          phone: member.userId.phone,
-          role: member.userId.isAdmin ? 'admin' : 'member',
-          isActive: member.isActive,
-          joinedAt: member.joinedAt,
-          isPending: !member.isActive
-        })
-      }
-    })
+    // Add regular members (with comprehensive null checks)
+    console.log(`[MessAPI] Processing ${mess.members?.length || 0} regular members`)
+    if (mess.members && mess.members.length > 0) {
+      mess.members.forEach((member: any, index: number) => {
+        if (!member || !member.userId || !member.userId._id) {
+          console.log(`[MessAPI] Warning: Member at index ${index} is null or userId is null`)
+          return // Skip this member
+        }
+        
+        try {
+          // Skip if this user is already added as an admin
+          const isAlreadyAdmin = allMembers.some(m => {
+            return m.userId && member.userId._id && m.userId.toString() === member.userId._id.toString()
+          })
+          
+          if (!isAlreadyAdmin) {
+            console.log(`[MessAPI] Adding member: ${member.userId.name || 'Unknown'}`)
+            allMembers.push({
+              userId: member.userId._id,
+              name: member.userId.name || 'Unknown',
+              email: member.userId.email || '',
+              phone: member.userId.phone || '',
+              role: member.userId.isAdmin ? 'admin' : 'member',
+              isActive: member.isActive,
+              joinedAt: member.joinedAt,
+              isPending: !member.isActive
+            })
+          } else {
+            console.log(`[MessAPI] Skipping member ${member.userId.name} (already added as admin)`)
+          }
+        } catch (memberError) {
+          console.error(`[MessAPI] Error processing member at index ${index}:`, memberError)
+        }
+      })
+    }
+
+    console.log(`[MessAPI] Successfully processed ${allMembers.length} total members`)
 
     // Format the response data
     const messData = {
