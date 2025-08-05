@@ -83,6 +83,77 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
   } | null>(null)
   const [finalOverview, setFinalOverview] = useState<any>(null)
   const [isProcessing, setIsProcessing] = useState(false)
+  const [debugInfo, setDebugInfo] = useState<{
+    lastError?: string
+    lastAttempt?: string
+    retryCount: number
+  }>({ retryCount: 0 })
+
+  // Debug helper function
+  const logDebugInfo = (info: string, data?: any) => {
+    console.log(`[MessSettings Debug] ${info}`, data || '')
+    setDebugInfo(prev => ({
+      ...prev,
+      lastAttempt: new Date().toISOString(),
+      lastError: info.includes('Error') ? info : prev.lastError
+    }))
+  }
+
+  // API Diagnostic function
+  const runDiagnostics = async () => {
+    const results = []
+    
+    try {
+      // Test 1: Check if we can reach the API at all
+      const healthResponse = await fetch('/api/user/profile', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      })
+      results.push(`✓ API reachable (Status: ${healthResponse.status})`)
+    } catch (error) {
+      results.push(`✗ API unreachable: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    try {
+      // Test 2: Check mess ID format
+      if (messId && messId.match(/^[0-9a-fA-F]{24}$/)) {
+        results.push(`✓ Mess ID format valid (${messId})`)
+      } else {
+        results.push(`✗ Mess ID format invalid (${messId})`)
+      }
+    } catch (error) {
+      results.push(`✗ Mess ID check failed`)
+    }
+
+    try {
+      // Test 3: Check token validity
+      const token = localStorage.getItem('token')
+      if (token) {
+        const tokenParts = token.split('.')
+        if (tokenParts.length === 3) {
+          // Decode token payload (without verification)
+          const payload = JSON.parse(atob(tokenParts[1]))
+          const isExpired = payload.exp && payload.exp * 1000 < Date.now()
+          results.push(`${isExpired ? '✗' : '✓'} Token ${isExpired ? 'expired' : 'valid'} (Expires: ${new Date(payload.exp * 1000).toLocaleString()})`)
+        } else {
+          results.push(`✗ Token format invalid`)
+        }
+      } else {
+        results.push(`✗ No token found`)
+      }
+    } catch (error) {
+      results.push(`✗ Token check failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    // Show results
+    const diagnosticText = results.join('\n')
+    console.log('Diagnostic Results:\n', diagnosticText)
+    showNotification('info', 'Diagnostic results logged to console')
+    
+    // Also copy to clipboard
+    navigator.clipboard.writeText(`MealNChill Diagnostics:\n${diagnosticText}\nTimestamp: ${new Date().toISOString()}`)
+  }
 
   useEffect(() => {
     fetchMessData()
@@ -101,15 +172,23 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
       setIsLoading(true)
       const token = localStorage.getItem('token')
       
+      logDebugInfo('Starting fetch', { messId, hasToken: !!token })
+      
       if (!token) {
+        logDebugInfo('Error: No token found in localStorage')
+        showNotification('error', 'Authentication required. Please login again.')
         setMessData(null)
         return
       }
 
       if (!messId) {
+        logDebugInfo('Error: No messId provided')
+        showNotification('error', 'Invalid mess ID. Please try refreshing the page.')
         setMessData(null)
         return
       }
+      
+      logDebugInfo('Making API call', `/api/mess/${messId}`)
       
       const response = await fetch(`/api/mess/${messId}`, {
         headers: {
@@ -117,8 +196,11 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
         },
       })
       
+      logDebugInfo('Response received', { status: response.status, ok: response.ok })
+      
       if (response.ok) {
         const data = await response.json()
+        logDebugInfo('Success: Data received', { messName: data.mess?.name, membersCount: data.mess?.members?.length })
         setMessData(data.mess)
         
         // Handle mealDeadlines properly - ensure we have an object with all fields
@@ -142,17 +224,62 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
           mealFrequency: data.mess.mealFrequency,
           mealDeadlines: mealDeadlines
         })
+        
+        showNotification('success', 'Mess settings loaded successfully!')
+        setDebugInfo(prev => ({ ...prev, retryCount: 0 })) // Reset retry count on success
       } else {
-        // Log error for debugging but don't show to user immediately
-        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
-        console.error('MessSettings - API Error:', response.status, errorData)
+        // Enhanced error handling with specific error messages
+        let errorData
+        try {
+          errorData = await response.json()
+        } catch (parseError) {
+          errorData = { message: `HTTP ${response.status} - ${response.statusText}` }
+        }
+        
+        logDebugInfo('API Error', {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+          url: `/api/mess/${messId}`
+        })
+        
+        // Show specific error messages based on status code
+        if (response.status === 401) {
+          showNotification('error', 'Authentication expired. Please login again.')
+        } else if (response.status === 403) {
+          showNotification('error', 'Access denied. You may not have permission to view this mess.')
+        } else if (response.status === 404) {
+          showNotification('error', 'Mess not found. It may have been deleted.')
+        } else if (response.status === 400) {
+          showNotification('error', errorData.message || 'Invalid request. Please check the mess ID.')
+        } else {
+          showNotification('error', `Server error (${response.status}): ${errorData.message || 'Unknown error'}`)
+        }
+        
         setMessData(null)
       }
     } catch (error) {
-      console.error('MessSettings - Fetch Error:', error)
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+      const errorStack = error instanceof Error ? error.stack : undefined
+      
+      logDebugInfo('Network/Fetch Error', {
+        message: errorMessage,
+        stack: errorStack?.substring(0, 200), // Truncate stack for readability
+        messId,
+        timestamp: new Date().toISOString()
+      })
+      
+      // Check for specific network errors
+      if (error instanceof Error && error.name === 'TypeError' && error.message.includes('fetch')) {
+        showNotification('error', 'Network connection failed. Please check your internet connection.')
+      } else {
+        showNotification('error', `Connection error: ${errorMessage}`)
+      }
+      
       setMessData(null)
     } finally {
       setIsLoading(false)
+      setDebugInfo(prev => ({ ...prev, retryCount: prev.retryCount + 1 }))
     }
   }, [messId])
 
@@ -494,8 +621,24 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
         <ul className="text-gray-600 text-left mb-6 space-y-1">
           <li>• Network connectivity issues</li>
           <li>• Authentication problems</li>
+          <li>• Invalid mess ID or permissions</li>
           <li>• Temporary server issues</li>
         </ul>
+        
+        {/* Debug Information */}
+        {debugInfo.retryCount > 0 && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6 text-left">
+            <h4 className="text-sm font-medium text-gray-900 mb-2">Debug Information:</h4>
+            <div className="text-xs text-gray-600 space-y-1">
+              <p><span className="font-medium">Mess ID:</span> {messId || 'Not provided'}</p>
+              <p><span className="font-medium">Has Auth Token:</span> {localStorage.getItem('token') ? 'Yes' : 'No'}</p>
+              <p><span className="font-medium">Retry Attempts:</span> {debugInfo.retryCount}</p>
+              {debugInfo.lastError && <p><span className="font-medium">Last Error:</span> {debugInfo.lastError}</p>}
+              {debugInfo.lastAttempt && <p><span className="font-medium">Last Attempt:</span> {new Date(debugInfo.lastAttempt).toLocaleString()}</p>}
+            </div>
+          </div>
+        )}
+        
         <div className="space-y-3">
           <button
             onClick={() => {
@@ -504,18 +647,74 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
             }}
             className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
           >
-            Try Again
+            Try Again {debugInfo.retryCount > 0 && `(Attempt ${debugInfo.retryCount + 1})`}
+          </button>
+          
+          <button
+            onClick={runDiagnostics}
+            className="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 transition-colors ml-3"
+          >
+            Run Diagnostics
           </button>
           <br />
-          <button
-            onClick={() => {
-              localStorage.removeItem('token')
-              window.location.reload()
-            }}
-            className="text-gray-500 hover:text-gray-700 text-sm underline"
-          >
-            Refresh Session
-          </button>
+          
+          {/* Show different options based on retry count */}
+          {debugInfo.retryCount < 2 ? (
+            <button
+              onClick={() => {
+                // Force refresh user data
+                window.location.reload()
+              }}
+              className="text-gray-500 hover:text-gray-700 text-sm underline"
+            >
+              Refresh Page
+            </button>
+          ) : (
+            <div className="space-y-2">
+              <button
+                onClick={() => {
+                  localStorage.removeItem('token')
+                  showNotification('info', 'Cleared authentication. Please login again.')
+                  setTimeout(() => window.location.reload(), 1500)
+                }}
+                className="text-red-500 hover:text-red-700 text-sm underline block"
+              >
+                Clear Session & Login Again
+              </button>
+              <button
+                onClick={() => {
+                  // Copy debug info to clipboard
+                  const debugText = `
+MessSettings Debug Info:
+- Mess ID: ${messId || 'Not provided'}
+- Has Token: ${localStorage.getItem('token') ? 'Yes' : 'No'}
+- Retry Count: ${debugInfo.retryCount}
+- Last Error: ${debugInfo.lastError || 'None'}
+- Last Attempt: ${debugInfo.lastAttempt || 'None'}
+- User Agent: ${navigator.userAgent}
+- Current URL: ${window.location.href}
+                  `.trim()
+                  navigator.clipboard.writeText(debugText)
+                  showNotification('info', 'Debug information copied to clipboard')
+                }}
+                className="text-blue-500 hover:text-blue-700 text-sm underline block"
+              >
+                Copy Debug Info
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* Quick troubleshooting steps */}
+        <div className="mt-6 p-4 bg-blue-50 rounded-lg text-left">
+          <h4 className="text-sm font-medium text-blue-900 mb-2">Quick Troubleshooting:</h4>
+          <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+            <li>Check your internet connection</li>
+            <li>Try refreshing the page</li>
+            <li>Clear your browser cache and cookies</li>
+            <li>Try logging out and logging back in</li>
+            <li>If the problem persists, contact support with the debug info above</li>
+          </ol>
         </div>
       </div>
     )
