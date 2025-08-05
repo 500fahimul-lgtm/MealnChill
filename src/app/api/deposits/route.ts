@@ -1,3 +1,4 @@
+import { isUserAdminOfMess } from '@/lib/adminUtils'
 import connectDB from '@/lib/mongodb'
 import Deposit from '@/models/Deposit'
 import Mess from '@/models/Mess'
@@ -124,11 +125,14 @@ export async function POST(request: NextRequest) {
     let status = 'pending'
     let approvedByUserId = null
 
-    if (isDirectEntry && currentUser.isAdmin) {
+    // Check if user is admin using centralized checking
+    const isAdmin = await isUserAdminOfMess(decoded.userId, currentUser.messId.toString())
+
+    if (isDirectEntry && isAdmin) {
       // Admin direct entry - automatically approved
       status = 'approved'
       approvedByUserId = decoded.userId
-    } else if (currentUser.isAdmin && userId && userId !== decoded.userId) {
+    } else if (isAdmin && userId && userId !== decoded.userId) {
       // Admin adding deposit for another member - automatically approved
       status = 'approved'
       approvedByUserId = decoded.userId

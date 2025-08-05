@@ -1,7 +1,9 @@
+import { isUserAdminOfMess } from '@/lib/adminUtils'
 import connectDB from '@/lib/mongodb'
 import Expense from '@/models/Expense'
 import MealAttendance from '@/models/MealAttendance'
 import Mess from '@/models/Mess'
+import User from '@/models/User'
 import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -157,8 +159,19 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = await verifyToken(token)
-    if (!decoded || !decoded.messId || !decoded.isAdmin) {
+    if (!decoded || !decoded.userId) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
+    }
+
+    // Get user to find their mess and check admin status
+    const user = await User.findById(decoded.userId)
+    if (!user || !user.messId) {
+      return NextResponse.json({ message: 'User not found or not in a mess' }, { status: 404 })
+    }
+
+    const isAdmin = await isUserAdminOfMess(decoded.userId, user.messId.toString())
+    if (!isAdmin) {
+      return NextResponse.json({ message: 'Unauthorized - Admin access required' }, { status: 403 })
     }
 
     const { description, amount, category, date, receipt } = await request.json()

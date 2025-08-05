@@ -26,10 +26,6 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Debug: Log token for debugging
-    console.log('Join API - Received token:', token ? token.substring(0, 20) + '...' : 'null')
-    console.log('Join API - Token length:', token ? token.length : 0)
-
     // Verify token
     const decoded = await verifyToken(token)
     if (!decoded) {

@@ -1,6 +1,6 @@
+import { isUserAdminOfMess } from '@/lib/adminUtils'
 import connectDB from '@/lib/mongodb'
 import Deposit from '@/models/Deposit'
-import Mess from '@/models/Mess'
 import Notification from '@/models/Notification'
 import User from '@/models/User'
 import jwt from 'jsonwebtoken'
@@ -38,9 +38,9 @@ export async function PUT(
       return NextResponse.json({ message: 'User not found or not in a mess' }, { status: 404 })
     }
 
-    // Check if user is admin using the isAdmin field
-    const mess = await Mess.findById(user.messId)
-    if (!mess || !user.isAdmin) {
+    // Check if user is admin using centralized admin checking
+    const isAdmin = await isUserAdminOfMess(decoded.userId, user.messId.toString())
+    if (!isAdmin) {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 

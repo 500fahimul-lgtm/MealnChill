@@ -56,7 +56,6 @@ export async function POST(req: NextRequest) {
     const { name, description, address, mealFrequency, adminIsActive } = await req.json()
 
     // Debug log the received data
-    console.log('Received mess creation data:', { name, description, address, mealFrequency, adminIsActive })
 
     // Validate required fields
     if (!name || !address) {
@@ -108,7 +107,6 @@ export async function POST(req: NextRequest) {
     await newMess.save()
 
     // Update user's messId, role, and isActive status
-    console.log('Updating user with messId:', newMess._id)
     await User.findByIdAndUpdate(userId, {
       messId: newMess._id,
       role: 'admin', // Set role as admin

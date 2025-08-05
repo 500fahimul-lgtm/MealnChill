@@ -1,3 +1,4 @@
+import { isUserAdminOfMess } from '@/lib/adminUtils'
 import connectDB from '@/lib/mongodb'
 import MealRoutine from '@/models/MealRoutine'
 import Notification from '@/models/Notification'
@@ -15,13 +16,18 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    if (!decoded || !decoded.messId) {
-      return NextResponse.json({ message: 'Invalid token' }, { status: 401 })
+    if (!decoded || !decoded.userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 403 })
     }
 
-    // Check if user is admin
+    // Check if user is admin using centralized admin checking
     const user = await User.findById(decoded.userId)
-    if (!user || !decoded.isAdmin) {
+    if (!user || !user.messId) {
+      return NextResponse.json({ message: 'User not found or not in a mess' }, { status: 404 })
+    }
+
+    const isAdmin = await isUserAdminOfMess(decoded.userId, user.messId.toString())
+    if (!isAdmin) {
       return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
     }
 

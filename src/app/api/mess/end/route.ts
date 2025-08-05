@@ -243,7 +243,6 @@ export async function POST(req: NextRequest) {
       // Don't fail the main operation if notification creation fails
     }
 
-    console.log(`Mess ${mess.name} (${messId}) ended by admin ${user.name} (${userId})`)
 
     return NextResponse.json({
       message: 'Mess ended successfully',

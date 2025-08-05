@@ -64,9 +64,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'Mess has not been started yet. Cannot prepare meals until mess is started.' }, { status: 403 })
     }
 
-    console.log(`DEBUG: User messId: ${messId}, type: ${typeof messId}`)
-    console.log(`DEBUG: Processing meal preparation for ${mealSlot} on ${date}`)
-
     // Parse date to ensure proper format
     const mealDate = new Date(date)
     if (isNaN(mealDate.getTime())) {
@@ -85,8 +82,6 @@ export async function POST(req: NextRequest) {
     })
 
     if (!mealRoutine) {
-      console.log(`DEBUG: No meal routine found for ${mealSlot} on ${date}. Creating default routine.`)
-      
       // Create a default meal routine with basic values
       const defaultMealName = mealSlot.charAt(0).toUpperCase() + mealSlot.slice(1)
       
