@@ -87,6 +87,8 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
     lastError?: string
     lastAttempt?: string
     retryCount: number
+    apiStatus?: number
+    apiMessage?: string
   }>({ retryCount: 0 })
 
   // Debug helper function
@@ -102,21 +104,47 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
   // API Diagnostic function
   const runDiagnostics = async () => {
     const results = []
+    const token = localStorage.getItem('token')
     
     try {
       // Test 1: Check if we can reach the API at all
       const healthResponse = await fetch('/api/user/profile', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+          'Authorization': `Bearer ${token}`,
         },
       })
-      results.push(`✓ API reachable (Status: ${healthResponse.status})`)
+      results.push(`✓ General API reachable (Status: ${healthResponse.status})`)
     } catch (error) {
-      results.push(`✗ API unreachable: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      results.push(`✗ General API unreachable: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
 
     try {
-      // Test 2: Check mess ID format
+      // Test 2: Test the specific mess API endpoint that's failing
+      const messResponse = await fetch(`/api/mess/${messId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      let errorData = null
+      if (!messResponse.ok) {
+        try {
+          errorData = await messResponse.json()
+        } catch (e) {
+          errorData = { message: 'Could not parse error response' }
+        }
+      }
+      
+      results.push(`${messResponse.ok ? '✓' : '✗'} Mess API (/api/mess/${messId}) - Status: ${messResponse.status}`)
+      if (errorData) {
+        results.push(`   Error Details: ${errorData.message || 'No message'}`)
+      }
+    } catch (error) {
+      results.push(`✗ Mess API failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+
+    try {
+      // Test 3: Check mess ID format
       if (messId && messId.match(/^[0-9a-fA-F]{24}$/)) {
         results.push(`✓ Mess ID format valid (${messId})`)
       } else {
@@ -127,15 +155,21 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
     }
 
     try {
-      // Test 3: Check token validity
-      const token = localStorage.getItem('token')
+      // Test 4: Check token validity and decode it
       if (token) {
         const tokenParts = token.split('.')
         if (tokenParts.length === 3) {
           // Decode token payload (without verification)
           const payload = JSON.parse(atob(tokenParts[1]))
           const isExpired = payload.exp && payload.exp * 1000 < Date.now()
-          results.push(`${isExpired ? '✗' : '✓'} Token ${isExpired ? 'expired' : 'valid'} (Expires: ${new Date(payload.exp * 1000).toLocaleString()})`)
+          const timeUntilExpiry = payload.exp ? Math.round((payload.exp * 1000 - Date.now()) / 1000 / 60) : 'Unknown'
+          
+          results.push(`${isExpired ? '✗' : '✓'} Token ${isExpired ? 'expired' : 'valid'}`)
+          results.push(`   Expires: ${new Date(payload.exp * 1000).toLocaleString()}`)
+          if (!isExpired) {
+            results.push(`   Time remaining: ${timeUntilExpiry} minutes`)
+          }
+          results.push(`   User ID: ${payload.userId || 'Not found'}`)
         } else {
           results.push(`✗ Token format invalid`)
         }
@@ -146,13 +180,24 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
       results.push(`✗ Token check failed: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
 
+    try {
+      // Test 5: Check environment and URL
+      results.push(`ℹ Environment: ${window.location.hostname}`)
+      results.push(`ℹ Current URL: ${window.location.href}`)
+      results.push(`ℹ User Agent: ${navigator.userAgent.substring(0, 50)}...`)
+    } catch (error) {
+      results.push(`✗ Environment check failed`)
+    }
+
     // Show results
     const diagnosticText = results.join('\n')
-    console.log('Diagnostic Results:\n', diagnosticText)
-    showNotification('info', 'Diagnostic results logged to console')
+    console.log('🔍 Diagnostic Results:\n', diagnosticText)
+    showNotification('info', 'Diagnostic results logged to console. Check browser console for details.')
     
     // Also copy to clipboard
-    navigator.clipboard.writeText(`MealNChill Diagnostics:\n${diagnosticText}\nTimestamp: ${new Date().toISOString()}`)
+    navigator.clipboard.writeText(`MealNChill Production Diagnostics:\n${diagnosticText}\nTimestamp: ${new Date().toISOString()}`)
+    
+    return results
   }
 
   useEffect(() => {
@@ -240,8 +285,18 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
           status: response.status,
           statusText: response.statusText,
           errorData,
-          url: `/api/mess/${messId}`
+          url: `/api/mess/${messId}`,
+          headers: Object.fromEntries(response.headers.entries()),
+          timestamp: new Date().toISOString()
         })
+        
+        // Store detailed error for debugging
+        setDebugInfo(prev => ({
+          ...prev,
+          lastError: `API Error: ${response.status} - ${errorData.message || response.statusText}`,
+          apiStatus: response.status,
+          apiMessage: errorData.message || 'No error message'
+        }))
         
         // Show specific error messages based on status code
         if (response.status === 401) {
@@ -252,6 +307,8 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
           showNotification('error', 'Mess not found. It may have been deleted.')
         } else if (response.status === 400) {
           showNotification('error', errorData.message || 'Invalid request. Please check the mess ID.')
+        } else if (response.status === 500) {
+          showNotification('error', 'Server error. Please try again later or contact support.')
         } else {
           showNotification('error', `Server error (${response.status}): ${errorData.message || 'Unknown error'}`)
         }
@@ -634,6 +691,8 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
               <p><span className="font-medium">Has Auth Token:</span> {localStorage.getItem('token') ? 'Yes' : 'No'}</p>
               <p><span className="font-medium">Retry Attempts:</span> {debugInfo.retryCount}</p>
               {debugInfo.lastError && <p><span className="font-medium">Last Error:</span> {debugInfo.lastError}</p>}
+              {debugInfo.apiStatus && <p><span className="font-medium">API Status Code:</span> {debugInfo.apiStatus}</p>}
+              {debugInfo.apiMessage && <p><span className="font-medium">API Message:</span> {debugInfo.apiMessage}</p>}
               {debugInfo.lastAttempt && <p><span className="font-medium">Last Attempt:</span> {new Date(debugInfo.lastAttempt).toLocaleString()}</p>}
             </div>
           </div>
@@ -655,6 +714,44 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
             className="bg-purple-500 text-white px-6 py-2 rounded-lg hover:bg-purple-600 transition-colors ml-3"
           >
             Run Diagnostics
+          </button>
+          
+          <button
+            onClick={async () => {
+              // Manual API test for immediate feedback
+              try {
+                const token = localStorage.getItem('token')
+                console.log('🧪 Manual API Test Starting...')
+                console.log('Token:', token ? `${token.substring(0, 20)}...` : 'None')
+                console.log('Mess ID:', messId)
+                
+                const response = await fetch(`/api/mess/${messId}`, {
+                  headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                  },
+                })
+                
+                console.log('Response Status:', response.status)
+                console.log('Response Headers:', Object.fromEntries(response.headers.entries()))
+                
+                if (response.ok) {
+                  const data = await response.json()
+                  console.log('✅ API Success:', data)
+                  showNotification('success', 'Manual API test successful! Check console for details.')
+                } else {
+                  const errorData = await response.json().catch(() => ({ message: 'Could not parse error' }))
+                  console.log('❌ API Error:', errorData)
+                  showNotification('error', `API Error ${response.status}: ${errorData.message}`)
+                }
+              } catch (error) {
+                console.log('💥 Network Error:', error)
+                showNotification('error', `Network Error: ${error instanceof Error ? error.message : 'Unknown'}`)
+              }
+            }}
+            className="bg-orange-500 text-white px-6 py-2 rounded-lg hover:bg-orange-600 transition-colors ml-3"
+          >
+            Test API
           </button>
           <br />
           
