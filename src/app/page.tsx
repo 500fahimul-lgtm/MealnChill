@@ -72,6 +72,10 @@ const ApprovalsManagement = dynamic(() => import('@/components/ApprovalsManageme
   loading: () => <ComponentLoader text="Loading Approvals..." />,
   ssr: false
 })
+const DemoModeAlert = dynamic(() => import('@/components/DemoModeAlert'), {
+  loading: () => null,
+  ssr: false
+})
 
 // Loading component optimized for mobile
 function ComponentLoader({ text }: { text: string }) {
@@ -118,6 +122,16 @@ export default function Home() {
   })
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0)
   const [isBadgeBouncing, setIsBadgeBouncing] = useState(false)
+  const [messStatus, setMessStatus] = useState<{
+    messId: string
+    messName: string
+    messCode: string
+    isStarted: boolean
+    messStatus: 'created' | 'started' | 'ended'
+    startedAt?: Date
+    endedAt?: Date
+    isUserAdmin: boolean
+  } | null>(null)
   const [recentActivities, setRecentActivities] = useState<Array<{
     id: string
     title: string
@@ -215,6 +229,7 @@ export default function Home() {
             fetchTodayMeals(token)
             fetchUnreadNotificationCount(token)
             fetchRecentActivities(token)
+            fetchMessStatus(token) // Add mess status fetching
           }
         } else {
           localStorage.removeItem('token')
@@ -289,7 +304,19 @@ export default function Home() {
 
       if (attendanceResponse.ok) {
         const attendanceData = await attendanceResponse.json()
-        const totalMeals = attendanceData.attendance?.length || 0
+        
+        // Calculate actual meals taken (including extra meals)
+        let totalMeals = 0
+        if (attendanceData.attendance && Array.isArray(attendanceData.attendance)) {
+          attendanceData.attendance.forEach((record: any) => {
+            if (record.isMealOn) {
+              totalMeals += 1 // Standard meal
+            }
+            if (record.extraMealCount > 0) {
+              totalMeals += record.extraMealCount // Extra meals
+            }
+          })
+        }
         
         // Calculate total possible meals for the month (only count days up to today)
         const today = new Date()
@@ -393,6 +420,23 @@ export default function Home() {
       }
     } catch (error) {
       setRecentActivities([])
+    }
+  }
+
+  const fetchMessStatus = async (token: string) => {
+    try {
+      const response = await fetch('/api/mess/status', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setMessStatus(data.messStatus)
+      }
+    } catch (error) {
+      console.error('Error fetching mess status:', error)
     }
   }
 
@@ -712,6 +756,15 @@ export default function Home() {
         <div className="max-w-7xl mx-auto">
           {!activeFeature && (
             <>
+              {/* Demo Mode Alert */}
+              {messStatus && user?.mess && (
+                <DemoModeAlert 
+                  messName={user.mess.name}
+                  messStatus={messStatus.messStatus}
+                  isAdmin={user.role === 'admin'}
+                />
+              )}
+
               {/* Hero Section */}
               <div className="bg-white/70 backdrop-blur-sm rounded-3xl shadow-lg border border-amber-200/50 p-6 sm:p-8 mb-8">
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">

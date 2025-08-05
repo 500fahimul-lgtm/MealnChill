@@ -54,6 +54,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: 'User is not part of any mess' }, { status: 400 })
     }
 
+    // Check if mess is started before allowing meal preparation
+    const mess = await Mess.findById(messId)
+    if (!mess) {
+      return NextResponse.json({ message: 'Mess not found' }, { status: 404 })
+    }
+
+    if (!mess.isStarted || mess.messStatus !== 'started') {
+      return NextResponse.json({ message: 'Mess has not been started yet. Cannot prepare meals until mess is started.' }, { status: 403 })
+    }
+
     console.log(`DEBUG: User messId: ${messId}, type: ${typeof messId}`)
     console.log(`DEBUG: Processing meal preparation for ${mealSlot} on ${date}`)
 

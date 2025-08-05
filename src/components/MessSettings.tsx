@@ -3,6 +3,7 @@
 import {
   Block,
   CalendarToday,
+  Info as InfoIcon,
   LightbulbOutlined,
   Search,
   Warning
@@ -70,9 +71,22 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
   const [mealManagement, setMealManagement] = useState<{[key: string]: any}>({})
   const [expandedMealControls, setExpandedMealControls] = useState<{[key: string]: boolean}>({})
   const [unsavedChanges, setUnsavedChanges] = useState<{[key: string]: boolean}>({})
+  const [messStatus, setMessStatus] = useState<{
+    messId: string
+    messName: string
+    messCode: string
+    isStarted: boolean
+    messStatus: 'created' | 'started' | 'ended'
+    startedAt?: Date
+    endedAt?: Date
+    isUserAdmin: boolean
+  } | null>(null)
+  const [finalOverview, setFinalOverview] = useState<any>(null)
+  const [isProcessing, setIsProcessing] = useState(false)
 
   useEffect(() => {
     fetchMessData()
+    fetchMessStatus()
   }, [messId])
 
   const showNotification = (type: 'success' | 'error' | 'info', message: string) => {
@@ -128,9 +142,93 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
     }
   }, [messId])
 
+  const fetchMessStatus = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      
+      const response = await fetch('/api/mess/status', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setMessStatus(data.messStatus)
+      }
+    } catch (error) {
+      console.error('Error fetching mess status:', error)
+    }
+  }, [])
+
+  const handleStartMess = async () => {
+    if (!window.confirm('Are you sure you want to start the mess? This will begin all meal calculations and tracking.')) {
+      return
+    }
+
+    try {
+      setIsProcessing(true)
+      const token = localStorage.getItem('token')
+      
+      const response = await fetch('/api/mess/start', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        await fetchMessStatus()
+        showNotification('success', 'Mess started successfully! All meal calculations are now active.')
+      } else {
+        const errorData = await response.json()
+        showNotification('error', errorData.message || 'Failed to start mess')
+      }
+    } catch (error) {
+      showNotification('error', 'Error starting mess. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleEndMess = async () => {
+    if (!window.confirm('Are you sure you want to end the mess? This action cannot be undone and will generate a final overview.')) {
+      return
+    }
+
+    try {
+      setIsProcessing(true)
+      const token = localStorage.getItem('token')
+      
+      const response = await fetch('/api/mess/end', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setFinalOverview(data.finalOverview)
+        await fetchMessStatus()
+        showNotification('success', 'Mess ended successfully! Final overview has been generated.')
+      } else {
+        const errorData = await response.json()
+        showNotification('error', errorData.message || 'Failed to end mess')
+      }
+    } catch (error) {
+      showNotification('error', 'Error ending mess. Please try again.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
   useEffect(() => {
     fetchMessData()
-  }, [fetchMessData])
+    fetchMessStatus()
+  }, [fetchMessData, fetchMessStatus])
 
   const handleUpdateMess = async () => {
     try {
@@ -475,6 +573,18 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
             >
               Manage Members
             </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('lifecycle')}
+                className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'lifecycle'
+                    ? 'border-primary-500 text-primary-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                Mess Lifecycle
+              </button>
+            )}
           </nav>
         </div>
 
@@ -957,6 +1067,213 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
                     </div>
                   )
                 })}
+              </div>
+            </div>
+          )}
+
+          {/* Mess Lifecycle Tab */}
+          {activeTab === 'lifecycle' && isAdmin && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold text-gray-900">Mess Lifecycle Management</h2>
+                <div className="text-sm text-gray-500">
+                  Status: <span className={`font-medium ${
+                    messStatus?.messStatus === 'started' ? 'text-green-600' : 
+                    messStatus?.messStatus === 'ended' ? 'text-gray-600' : 'text-orange-600'
+                  }`}>
+                    {messStatus?.messStatus === 'started' ? 'Active' : 
+                     messStatus?.messStatus === 'ended' ? 'Ended' : 'Not Started'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Current Status Card */}
+              <div className="bg-gray-50 rounded-lg p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Current Mess Status</h3>
+                
+                {messStatus?.messStatus === 'created' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-orange-400 rounded-full"></div>
+                      <span className="text-gray-700">Mess created but not started yet</span>
+                    </div>
+                    <p className="text-sm text-gray-600 ml-6">
+                      Members can see the interface but all calculations are on hold. 
+                      Start the mess when you're ready to begin meal tracking and billing.
+                    </p>
+                    <div className="mt-4">
+                      <button
+                        onClick={handleStartMess}
+                        disabled={isProcessing}
+                        className="bg-green-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {isProcessing ? 'Starting...' : 'Start Mess'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {messStatus?.messStatus === 'started' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                      <span className="text-gray-700">Mess is active and running</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 ml-6">
+                      <div>
+                        <p className="text-sm text-gray-600">Started At:</p>
+                        <p className="font-medium text-gray-900">
+                          {messStatus.startedAt ? new Date(messStatus.startedAt).toLocaleString() : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Running Days:</p>
+                        <p className="font-medium text-gray-900">
+                          {messStatus.startedAt ? 
+                            Math.ceil((new Date().getTime() - new Date(messStatus.startedAt).getTime()) / (1000 * 60 * 60 * 24)) 
+                            : 0} days
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <button
+                        onClick={handleEndMess}
+                        disabled={isProcessing}
+                        className="bg-red-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                      >
+                        {isProcessing ? 'Ending...' : 'End Mess'}
+                      </button>
+                      <p className="text-xs text-gray-500 mt-2">
+                        This will generate a final overview and stop all calculations
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {messStatus?.messStatus === 'ended' && (
+                  <div className="space-y-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                      <span className="text-gray-700">Mess has been ended</span>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 ml-6">
+                      <div>
+                        <p className="text-sm text-gray-600">Started At:</p>
+                        <p className="font-medium text-gray-900">
+                          {messStatus.startedAt ? new Date(messStatus.startedAt).toLocaleString() : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Ended At:</p>
+                        <p className="font-medium text-gray-900">
+                          {messStatus.endedAt ? new Date(messStatus.endedAt).toLocaleString() : 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Total Duration:</p>
+                        <p className="font-medium text-gray-900">
+                          {messStatus.startedAt && messStatus.endedAt ? 
+                            Math.ceil((new Date(messStatus.endedAt).getTime() - new Date(messStatus.startedAt).getTime()) / (1000 * 60 * 60 * 24)) 
+                            : 0} days
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Final Overview Section */}
+              {finalOverview && messStatus?.messStatus === 'ended' && (
+                <div className="bg-white border rounded-lg p-6">
+                  <h3 className="text-lg font-medium text-gray-900 mb-4">Final Mess Overview</h3>
+                  
+                  {/* Financial Summary */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <p className="text-sm text-blue-600">Total Expenses</p>
+                      <p className="text-xl font-bold text-blue-700">₹{finalOverview.financialSummary.totalExpenses}</p>
+                    </div>
+                    <div className="bg-green-50 p-4 rounded-lg">
+                      <p className="text-sm text-green-600">Total Deposits</p>
+                      <p className="text-xl font-bold text-green-700">₹{finalOverview.financialSummary.totalDeposits}</p>
+                    </div>
+                    <div className={`p-4 rounded-lg ${finalOverview.financialSummary.balance >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                      <p className={`text-sm ${finalOverview.financialSummary.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>Balance</p>
+                      <p className={`text-xl font-bold ${finalOverview.financialSummary.balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                        ₹{finalOverview.financialSummary.balance}
+                      </p>
+                    </div>
+                    <div className="bg-purple-50 p-4 rounded-lg">
+                      <p className="text-sm text-purple-600">Total Meals</p>
+                      <p className="text-xl font-bold text-purple-700">{finalOverview.financialSummary.totalMealsServed}</p>
+                    </div>
+                  </div>
+
+                  {/* Member Statistics */}
+                  <div className="mb-6">
+                    <h4 className="text-md font-medium text-gray-900 mb-3">Member Meal Statistics</h4>
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Meals</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Breakfast</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Lunch</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dinner</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Extra Meals</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {finalOverview.memberStats.map((member: any, index: number) => (
+                            <tr key={index}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{member.name}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.totalMeals}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.breakfastCount}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.lunchCount}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.dinnerCount}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{member.extraMeals}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Download/Export Options */}
+                  <div className="border-t pt-4">
+                    <p className="text-sm text-gray-600 mb-2">Export final overview:</p>
+                    <button
+                      onClick={() => {
+                        const dataStr = JSON.stringify(finalOverview, null, 2)
+                        const dataBlob = new Blob([dataStr], {type: 'application/json'})
+                        const url = URL.createObjectURL(dataBlob)
+                        const link = document.createElement('a')
+                        link.href = url
+                        link.download = `mess-final-overview-${messStatus?.messName?.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`
+                        link.click()
+                      }}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700"
+                    >
+                      Download JSON Report
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Information Section */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <InfoIcon className="w-5 h-5 text-blue-600 mt-0.5" />
+                  <div>
+                    <h4 className="text-sm font-medium text-blue-800">About Mess Lifecycle</h4>
+                    <div className="text-sm text-blue-700 mt-1 space-y-1">
+                      <p><strong>Created:</strong> Mess is set up but calculations haven't started. Members see demo interface.</p>
+                      <p><strong>Started:</strong> All meal tracking, billing, and calculations are active.</p>
+                      <p><strong>Ended:</strong> Mess operations are complete with final overview generated.</p>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}

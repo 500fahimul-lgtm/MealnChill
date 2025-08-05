@@ -115,6 +115,21 @@ const messSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
+  isStarted: {
+    type: Boolean,
+    default: false,
+  },
+  startedAt: {
+    type: Date,
+  },
+  endedAt: {
+    type: Date,
+  },
+  messStatus: {
+    type: String,
+    enum: ['created', 'started', 'ended'],
+    default: 'created',
+  },
   totalDepositedAmountCurrentCycle: {
     type: Number,
     default: 0,

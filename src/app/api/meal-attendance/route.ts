@@ -33,6 +33,15 @@ export async function GET(req: NextRequest) {
       )
     }
 
+    // Check if mess is started (allow read operations in demo mode)
+    const mess = await Mess.findById(user.messId._id)
+    if (!mess) {
+      return NextResponse.json(
+        { message: 'Mess not found' },
+        { status: 404 }
+      )
+    }
+
     const { searchParams } = new URL(req.url)
     const dateParam = searchParams.get('date')
     const targetUserId = searchParams.get('targetUserId') // For admin to fetch specific user data
@@ -123,8 +132,8 @@ export async function GET(req: NextRequest) {
     })
 
     // Get mess meal frequency to determine available slots
-    const mess = user.messId
-    const mealSlots = mess.mealFrequency === 3 
+    const messData = user.messId
+    const mealSlots = messData.mealFrequency === 3 
       ? ['breakfast', 'lunch', 'dinner']
       : ['lunch', 'dinner']
 
@@ -155,8 +164,8 @@ export async function GET(req: NextRequest) {
     })))
 
     // Get all active mess members
-    const messData = user.messId
-    const activeMembers = messData.members.filter((member: any) => member.isActive)
+    const messInfo2 = user.messId
+    const activeMembers = messInfo2.members.filter((member: any) => member.isActive)
     
     console.log(`DEBUG - Active members:`, activeMembers.map((m: any) => ({
       userId: m.userId.toString(),
@@ -301,6 +310,22 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Check if mess is started before allowing write operations
+    const mess = await Mess.findById(user.messId._id)
+    if (!mess) {
+      return NextResponse.json(
+        { message: 'Mess not found' },
+        { status: 404 }
+      )
+    }
+
+    if (!mess.isStarted || mess.messStatus !== 'started') {
+      return NextResponse.json(
+        { message: 'Mess has not been started yet. Ask your admin to start the mess.' },
+        { status: 403 }
+      )
+    }
+
     const { date, mealSlot, isMealOn, extraMealCount, targetUserId, isAdminOverride } = await req.json()
 
     console.log(`DEBUG: POST /api/meal-attendance received:`, {
@@ -330,7 +355,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Check if deadline has passed for this meal slot (except for admins)
-    const mess = user.messId
+    const messInfo = user.messId
     const currentTime = new Date()
     const requestDate = new Date(date)
     
@@ -394,7 +419,7 @@ export async function POST(req: NextRequest) {
     }
     
     if (shouldCheckDeadline) {
-      const mealDeadlines = mess.mealDeadlines || {
+      const mealDeadlines = messInfo.mealDeadlines || {
         breakfast: '10:00',
         lunch: '14:00',
         dinner: '20:00'
