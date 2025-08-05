@@ -106,11 +106,15 @@ export async function GET(req: NextRequest) {
     }
 
     console.log('Processing date parameter:', dateParam)
+    console.log('Current server time:', new Date().toISOString())
+    console.log('Current Bangladesh time:', new Date().toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }))
+    
     // Parse the date string for Bangladesh timezone (GMT+6)
     // When frontend sends "2025-08-06", treat it as BD date, not UTC
     const dateString = dateParam + 'T00:00:00+06:00' // Add BD timezone offset
     const normalizedDate = new Date(dateString)
     console.log('Normalized date:', normalizedDate.toISOString())
+    console.log('Normalized date in BD timezone:', normalizedDate.toLocaleString('en-US', { timeZone: 'Asia/Dhaka' }))
 
     // Determine which user's data to fetch
     let targetUserIdToFetch = userId // Default to logged-in user

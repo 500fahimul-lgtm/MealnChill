@@ -1,22 +1,22 @@
 'use client'
 
 import {
-  AccessTime,
-  AdminPanelSettings,
-  Assignment,
-  BarChart,
-  Block,
-  CheckCircle,
-  Close,
-  Email,
-  GpsFixed,
-  HourglassTop,
-  Info,
-  Kitchen,
-  Restaurant,
-  Save,
-  Undo,
-  Warning
+    AccessTime,
+    AdminPanelSettings,
+    Assignment,
+    BarChart,
+    Block,
+    CheckCircle,
+    Close,
+    Email,
+    GpsFixed,
+    HourglassTop,
+    Info,
+    Kitchen,
+    Restaurant,
+    Save,
+    Undo,
+    Warning
 } from '@mui/icons-material'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -121,8 +121,13 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: { isMealOn?: boolean, extraMealCount?: number } }>({})
   const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
 
-  // Always use current date
-  const getCurrentDateStr = () => new Date().toISOString().split('T')[0]
+  // Always use current date in Bangladesh timezone
+  const getCurrentDateStr = () => {
+    // Get current date in Bangladesh timezone (GMT+6)
+    const now = new Date()
+    const bangladeshTime = new Date(now.getTime() + (6 * 60 * 60 * 1000)) // Add 6 hours for GMT+6
+    return bangladeshTime.toISOString().split('T')[0]
+  }
 
   // Deadline calculation function
   const calculateDeadlineStatus = useCallback((mealSlot: string): DeadlineStatus => {
@@ -724,7 +729,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
     <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
       <div className="mb-6">
         <h3 className="text-xl font-semibold text-gray-900 mb-2">Meal Attendance</h3>
-        <p className="text-gray-600">Today - {formatDate(new Date())}</p>
+        <p className="text-gray-600">Today - {formatDate(new Date(new Date().getTime() + (6 * 60 * 60 * 1000)))}</p>
         <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
           <p className="text-sm text-blue-800">
             <span className="font-semibold flex items-center">
