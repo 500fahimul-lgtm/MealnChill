@@ -127,9 +127,19 @@ export async function GET(req: NextRequest) {
     })
 
     // Get meal routines for the day to show meal names
+    // Try both Bangladesh timezone and UTC to handle existing data
+    const bdDate = new Date(dateString) // Bangladesh timezone
+    const utcDateString = dateParam + 'T00:00:00.000Z' // UTC timezone  
+    const utcDate = new Date(utcDateString)
+    
+    console.log('Trying multiple date formats:', {
+      bdDate: bdDate.toISOString(),
+      utcDate: utcDate.toISOString()
+    })
+    
     const mealRoutines = await MealRoutine.find({
       messId: user.messId,
-      date: normalizedDate,
+      date: { $in: [bdDate, utcDate] }, // Look for either date format
       isActive: true
     })
     
