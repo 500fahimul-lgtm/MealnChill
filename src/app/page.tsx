@@ -2,23 +2,23 @@
 
 import AnimatedIcon from '@/components/ui/AnimatedIcon'
 import {
-    AccountBalance as AccountBalanceIcon,
-    Add as AddIcon,
-    AdminPanelSettings as AdminIcon,
-    Approval as ApprovalIcon,
-    BarChart as ChartIcon,
-    CheckCircle as CheckCircleIcon,
-    Group as GroupIcon,
-    Home as HomeIcon,
-    Info as InfoIcon,
-    Inventory as InventoryIcon,
-    Kitchen as KitchenIcon,
-    AttachMoney as MoneyIcon,
-    Notifications as NotificationsIcon,
-    Person as PersonIcon,
-    Receipt as ReceiptIcon,
-    Restaurant as RestaurantIcon,
-    Settings as SettingsIcon
+  AccountBalance as AccountBalanceIcon,
+  Add as AddIcon,
+  AdminPanelSettings as AdminIcon,
+  Approval as ApprovalIcon,
+  BarChart as ChartIcon,
+  CheckCircle as CheckCircleIcon,
+  Group as GroupIcon,
+  Home as HomeIcon,
+  Info as InfoIcon,
+  Inventory as InventoryIcon,
+  Kitchen as KitchenIcon,
+  AttachMoney as MoneyIcon,
+  Notifications as NotificationsIcon,
+  Person as PersonIcon,
+  Receipt as ReceiptIcon,
+  Restaurant as RestaurantIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material'
 import { CircularProgress } from '@mui/material'
 import dynamic from 'next/dynamic'
@@ -664,7 +664,7 @@ export default function Home() {
             {activeFeature === 'approvals' && user.mess.isAdmin && (
               <ApprovalsManagement />
             )}
-            {activeFeature === 'mess-settings' && user.mess.isAdmin && (
+            {activeFeature === 'mess-settings' && user.mess && user.mess.isAdmin && user.mess.id && (
               <MessSettings 
                 messId={user.mess.id}
                 isAdmin={user.mess.isAdmin}

@@ -10,6 +10,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
     // Get token from Authorization header
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
+    
     if (!token) {
       return NextResponse.json(
         { message: 'No token provided' },
@@ -24,11 +25,20 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const resolvedParams = await params
     const messId = resolvedParams.id
 
+    // Validate messId format (MongoDB ObjectId)
+    if (!messId || !messId.match(/^[0-9a-fA-F]{24}$/)) {
+      return NextResponse.json(
+        { message: 'Invalid mess ID format' },
+        { status: 400 }
+      )
+    }
+
     // Get user to verify they belong to this mess
     const user = await User.findById(userId)
+    
     if (!user || !user.messId || user.messId.toString() !== messId) {
       return NextResponse.json(
-        { message: 'Access denied' },
+        { message: 'Access denied - User not found or not member of this mess' },
         { status: 403 }
       )
     }

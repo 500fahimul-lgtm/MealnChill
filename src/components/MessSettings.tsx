@@ -101,6 +101,16 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
       setIsLoading(true)
       const token = localStorage.getItem('token')
       
+      if (!token) {
+        setMessData(null)
+        return
+      }
+
+      if (!messId) {
+        setMessData(null)
+        return
+      }
+      
       const response = await fetch(`/api/mess/${messId}`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -133,10 +143,14 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
           mealDeadlines: mealDeadlines
         })
       } else {
-        // Handle error silently
+        // Log error for debugging but don't show to user immediately
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }))
+        console.error('MessSettings - API Error:', response.status, errorData)
+        setMessData(null)
       }
     } catch (error) {
-      // Handle error silently
+      console.error('MessSettings - Fetch Error:', error)
+      setMessData(null)
     } finally {
       setIsLoading(false)
     }
@@ -470,11 +484,39 @@ export default function MessSettings({ messId, isAdmin }: MessSettingsProps) {
   if (!messData) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-8 text-center">
-        <div className="text-gray-500 text-6xl mb-4">
+        <div className="text-yellow-500 text-6xl mb-4">
           <Warning style={{ fontSize: '6rem' }} />
         </div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">No Data Found</h2>
-        <p className="text-gray-600">Unable to load mess settings.</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Unable to Load Mess Settings</h2>
+        <p className="text-gray-600 mb-4">
+          There was an issue loading the mess data. This could be due to:
+        </p>
+        <ul className="text-gray-600 text-left mb-6 space-y-1">
+          <li>• Network connectivity issues</li>
+          <li>• Authentication problems</li>
+          <li>• Temporary server issues</li>
+        </ul>
+        <div className="space-y-3">
+          <button
+            onClick={() => {
+              setIsLoading(true)
+              fetchMessData()
+            }}
+            className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition-colors"
+          >
+            Try Again
+          </button>
+          <br />
+          <button
+            onClick={() => {
+              localStorage.removeItem('token')
+              window.location.reload()
+            }}
+            className="text-gray-500 hover:text-gray-700 text-sm underline"
+          >
+            Refresh Session
+          </button>
+        </div>
       </div>
     )
   }
