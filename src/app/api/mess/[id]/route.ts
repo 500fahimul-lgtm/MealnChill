@@ -5,55 +5,90 @@ import jwt from 'jsonwebtoken'
 import { NextRequest, NextResponse } from 'next/server'
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const startTime = Date.now()
+  console.log(`[MessAPI] GET request started at ${new Date().toISOString()}`)
+  
   try {
+    // Enhanced connection with timeout
+    console.log(`[MessAPI] Attempting database connection...`)
+    const connectStart = Date.now()
     await connectDB()
+    console.log(`[MessAPI] Database connected in ${Date.now() - connectStart}ms`)
 
     // Get token from Authorization header
     const token = req.headers.get('authorization')?.replace('Bearer ', '')
     
     if (!token) {
+      console.log(`[MessAPI] No token provided`)
       return NextResponse.json(
         { message: 'No token provided' },
         { status: 401 }
       )
     }
 
-    // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
+    // Verify token with enhanced error handling
+    let decoded: any
+    try {
+      console.log(`[MessAPI] Verifying JWT token...`)
+      decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
+      console.log(`[MessAPI] Token verified for user: ${decoded.userId}`)
+    } catch (jwtError) {
+      console.error(`[MessAPI] JWT verification failed:`, jwtError)
+      return NextResponse.json(
+        { message: 'Invalid or expired token' },
+        { status: 401 }
+      )
+    }
+    
     const userId = decoded.userId
 
     const resolvedParams = await params
     const messId = resolvedParams.id
+    console.log(`[MessAPI] Processing request for mess ID: ${messId}`)
 
     // Validate messId format (MongoDB ObjectId)
     if (!messId || !messId.match(/^[0-9a-fA-F]{24}$/)) {
+      console.log(`[MessAPI] Invalid mess ID format: ${messId}`)
       return NextResponse.json(
         { message: 'Invalid mess ID format' },
         { status: 400 }
       )
     }
 
-    // Get user to verify they belong to this mess
-    const user = await User.findById(userId)
+    // Get user to verify they belong to this mess with timeout
+    console.log(`[MessAPI] Finding user: ${userId}`)
+    const userStart = Date.now()
+    const user = await User.findById(userId).maxTimeMS(5000) // 5 second timeout
+    console.log(`[MessAPI] User query completed in ${Date.now() - userStart}ms`)
     
     if (!user || !user.messId || user.messId.toString() !== messId) {
+      console.log(`[MessAPI] Access denied - User: ${!!user}, MessId match: ${user?.messId?.toString() === messId}`)
       return NextResponse.json(
         { message: 'Access denied - User not found or not member of this mess' },
         { status: 403 }
       )
     }
 
-    // Get mess data with populated member details
+    // Get mess data with populated member details - Enhanced with timeout and error handling
+    console.log(`[MessAPI] Fetching mess data with populated fields...`)
+    const messStart = Date.now()
     const mess = await Mess.findById(messId)
       .populate('members.userId', 'name email phone isAdmin')
       .populate('adminId', 'name email phone isAdmin')
       .populate('adminIds', 'name email phone isAdmin')
+      .maxTimeMS(10000) // 10 second timeout for complex populate
+    
+    console.log(`[MessAPI] Mess query completed in ${Date.now() - messStart}ms`)
+    
     if (!mess) {
+      console.log(`[MessAPI] Mess not found for ID: ${messId}`)
       return NextResponse.json(
         { message: 'Mess not found' },
         { status: 404 }
       )
     }
+
+    console.log(`[MessAPI] Found mess: ${mess.name} with ${mess.members?.length || 0} members`)
 
     // Check if user is admin
     const isAdmin = mess.adminIds?.some((adminId: any) => adminId._id.toString() === userId) ||
@@ -130,12 +165,47 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       members: allMembers
     }
 
+    console.log(`[MessAPI] Successfully processed mess data in ${Date.now() - startTime}ms`)
     return NextResponse.json({ mess: messData })
   } catch (error) {
-    console.error('Get mess error:', error)
+    const duration = Date.now() - startTime
+    console.error(`[MessAPI] Error after ${duration}ms:`, error)
+    
+    // Enhanced error logging for debugging
+    if (error instanceof Error) {
+      console.error(`[MessAPI] Error name: ${error.name}`)
+      console.error(`[MessAPI] Error message: ${error.message}`)
+      console.error(`[MessAPI] Error stack: ${error.stack?.substring(0, 500)}`)
+    }
+    
+    // Check for specific MongoDB errors
+    let errorMessage = 'Internal server error'
+    let statusCode = 500
+    
+    if (error instanceof Error) {
+      if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+        errorMessage = 'Database operation timed out - server may be overloaded'
+        console.error(`[MessAPI] Database timeout detected`)
+      } else if (error.message.includes('connection') || error.message.includes('CONNECTION')) {
+        errorMessage = 'Database connection failed - please try again'
+        console.error(`[MessAPI] Database connection error detected`)
+      } else if (error.message.includes('JWT') || error.message.includes('token')) {
+        errorMessage = 'Authentication error'
+        statusCode = 401
+        console.error(`[MessAPI] JWT/Token error detected`)
+      }
+    }
+    
     return NextResponse.json(
-      { message: 'Internal server error' },
-      { status: 500 }
+      { 
+        message: errorMessage,
+        debug: process.env.NODE_ENV === 'development' ? {
+          error: error instanceof Error ? error.message : 'Unknown error',
+          duration: `${duration}ms`,
+          timestamp: new Date().toISOString()
+        } : undefined
+      },
+      { status: statusCode }
     )
   }
 }
