@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
 
     const today = new Date()
     const todayStr = today.toISOString().split('T')[0]
+    // Use local date to avoid timezone issues
     const normalizedToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
 
     // Get today's routines specifically

@@ -76,10 +76,16 @@ export async function GET(req: NextRequest) {
       )
     }
 
-    const date = new Date(dateParam)
+    // Parse the date string correctly to avoid timezone issues
+    const [year, month, day] = dateParam.split('-').map(Number)
+    const normalizedDate = new Date(year, month - 1, day) // month is 0-indexed
     
-    // Normalize the date to avoid timezone issues
-    const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    console.log('Date processing debug:', {
+      dateParam,
+      parsedComponents: { year, month, day },
+      normalizedDate: normalizedDate.toISOString(),
+      normalizedDateLocal: normalizedDate.toLocaleDateString()
+    })
 
     // Determine which user's data to fetch
     let targetUserIdToFetch = userId // Default to logged-in user
