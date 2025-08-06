@@ -1,5 +1,9 @@
 'use client'
 
+import FiberNewIcon from '@mui/icons-material/FiberNew'
+import HomeIcon from '@mui/icons-material/Home'
+import PeopleIcon from '@mui/icons-material/People'
+import TrendingUpIcon from '@mui/icons-material/TrendingUp'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -117,28 +121,28 @@ export default function AdminDashboard() {
           title="Total Users"
           value={stats.overview.totalUsers}
           subtitle={`${stats.overview.activeUsers} active`}
-          icon="👥"
+          icon={PeopleIcon}
           color="blue"
         />
         <StatCard
           title="Total Messes"
           value={stats.overview.totalMesses}
           subtitle={`${stats.overview.activeMesses} active`}
-          icon="🏠"
+          icon={HomeIcon}
           color="green"
         />
         <StatCard
           title="New Users Today"
           value={stats.growth.today.users}
           subtitle={`${stats.growth.week.users} this week`}
-          icon="📈"
+          icon={TrendingUpIcon}
           color="indigo"
         />
         <StatCard
           title="New Messes Today"
           value={stats.growth.today.messes}
           subtitle={`${stats.growth.week.messes} this week`}
-          icon="🆕"
+          icon={FiberNewIcon}
           color="purple"
         />
       </div>
@@ -293,11 +297,11 @@ interface StatCardProps {
   title: string
   value: number
   subtitle: string
-  icon: string
+  icon: React.ComponentType<{ className?: string }>
   color: 'blue' | 'green' | 'indigo' | 'purple'
 }
 
-function StatCard({ title, value, subtitle, icon, color }: StatCardProps) {
+function StatCard({ title, value, subtitle, icon: IconComponent, color }: StatCardProps) {
   const colorClasses = {
     blue: 'text-blue-600 bg-blue-100',
     green: 'text-green-600 bg-green-100',
@@ -311,7 +315,7 @@ function StatCard({ title, value, subtitle, icon, color }: StatCardProps) {
         <div className="flex items-center">
           <div className="flex-shrink-0">
             <div className={`p-3 rounded-md ${colorClasses[color]}`}>
-              <span className="text-2xl">{icon}</span>
+              <IconComponent className="h-8 w-8" />
             </div>
           </div>
           <div className="ml-5 w-0 flex-1">

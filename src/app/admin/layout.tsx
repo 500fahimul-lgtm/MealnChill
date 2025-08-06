@@ -1,6 +1,11 @@
 'use client'
 
 import { useAdminAuth } from '@/lib/useAdminAuth'
+import DashboardIcon from '@mui/icons-material/Dashboard'
+import HomeIcon from '@mui/icons-material/Home'
+import LogoutIcon from '@mui/icons-material/Logout'
+import PeopleIcon from '@mui/icons-material/People'
+import SettingsIcon from '@mui/icons-material/Settings'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -29,10 +34,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
   }, [pathname, isLoading, isAuthenticated, router])
 
   const navigation = [
-    { name: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
-    { name: 'Messes', href: '/admin/messes', icon: '🏠' },
-    { name: 'Users', href: '/admin/users', icon: '👥' },
-    { name: 'Settings', href: '/admin/settings', icon: '⚙️' },
+    { name: 'Dashboard', href: '/admin/dashboard', icon: DashboardIcon },
+    { name: 'Messes', href: '/admin/messes', icon: HomeIcon },
+    { name: 'Users', href: '/admin/users', icon: PeopleIcon },
+    { name: 'Settings', href: '/admin/settings', icon: SettingsIcon },
   ]
 
   // If we're on the login page, render children directly without auth check
@@ -168,6 +173,7 @@ function SidebarContent({ navigation, pathname, onLogout, adminData }: any) {
         <nav className="flex-1 px-2 py-4 bg-white space-y-1">
           {navigation.map((item: any) => {
             const isActive = pathname === item.href
+            const IconComponent = item.icon
             return (
               <Link
                 key={item.name}
@@ -178,7 +184,7 @@ function SidebarContent({ navigation, pathname, onLogout, adminData }: any) {
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
-                <span className="mr-3 text-lg">{item.icon}</span>
+                <IconComponent className="mr-3 h-5 w-5" />
                 {item.name}
               </Link>
             )
@@ -203,7 +209,7 @@ function SidebarContent({ navigation, pathname, onLogout, adminData }: any) {
               className="text-sm text-gray-500 hover:text-red-600 focus:outline-none"
               title="Logout"
             >
-              🚪
+              <LogoutIcon className="h-5 w-5" />
             </button>
           </div>
         </div>

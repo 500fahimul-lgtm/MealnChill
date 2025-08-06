@@ -1,5 +1,7 @@
 'use client'
 
+import VisibilityIcon from '@mui/icons-material/Visibility'
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
@@ -10,6 +12,7 @@ export default function AdminLogin() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const router = useRouter()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -17,6 +20,10 @@ export default function AdminLogin() {
       ...formData,
       [e.target.name]: e.target.value
     })
+  }
+
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -87,20 +94,46 @@ export default function AdminLogin() {
                 onChange={handleChange}
               />
             </div>
-            <div>
+            <div className="relative">
               <label htmlFor="password" className="sr-only">
                 Password
               </label>
               <input
                 id="password"
                 name="password"
-                type="password"
+                type={showPassword ? "text" : "password"}
                 required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+                className="appearance-none rounded-none relative block w-full px-3 py-2 pr-10 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 placeholder="Password"
                 value={formData.password}
                 onChange={handleChange}
               />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center group"
+                onClick={togglePasswordVisibility}
+                tabIndex={-1}
+              >
+                <div className="relative w-5 h-5 overflow-hidden">
+                  <VisibilityIcon 
+                    className={`absolute inset-0 h-5 w-5 text-gray-400 group-hover:text-indigo-500 transition-all duration-500 ease-in-out transform ${
+                      showPassword 
+                        ? 'translate-y-0 opacity-100 rotate-0 scale-100' 
+                        : 'translate-y-6 opacity-0 rotate-180 scale-75'
+                    }`}
+                  />
+                  <VisibilityOffIcon 
+                    className={`absolute inset-0 h-5 w-5 text-gray-400 group-hover:text-indigo-500 transition-all duration-500 ease-in-out transform ${
+                      !showPassword 
+                        ? 'translate-y-0 opacity-100 rotate-0 scale-100' 
+                        : '-translate-y-6 opacity-0 -rotate-180 scale-75'
+                    }`}
+                  />
+                </div>
+                <span className="sr-only">
+                  {showPassword ? 'Hide password' : 'Show password'}
+                </span>
+              </button>
             </div>
           </div>
 

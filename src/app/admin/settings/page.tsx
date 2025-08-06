@@ -1,5 +1,8 @@
 'use client'
 
+import DeleteIcon from '@mui/icons-material/Delete'
+import LockIcon from '@mui/icons-material/Lock'
+import WarningIcon from '@mui/icons-material/Warning'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -382,7 +385,10 @@ export default function AdminSettings() {
       {/* Database Management */}
       <div className="bg-white shadow sm:rounded-lg border-l-4 border-red-400">
         <div className="px-4 py-5 sm:p-6">
-          <h3 className="text-lg leading-6 font-medium text-red-900">⚠️ Danger Zone - Database Management</h3>
+          <h3 className="text-lg leading-6 font-medium text-red-900 flex items-center">
+            <WarningIcon className="mr-2 h-5 w-5" />
+            Danger Zone - Database Management
+          </h3>
           <p className="mt-1 text-sm text-red-600">
             Critical database operations. Use with extreme caution.
           </p>
@@ -407,7 +413,10 @@ export default function AdminSettings() {
                       <li>All inventory and meal routines</li>
                       <li>All notifications and leave requests</li>
                     </ul>
-                    <p className="mt-2 font-semibold">⚠️ This action cannot be undone! Admin accounts will be preserved.</p>
+                    <p className="mt-2 font-semibold flex items-center text-red-700">
+                      <WarningIcon className="mr-2 h-4 w-4" />
+                      This action cannot be undone! Admin accounts will be preserved.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -427,7 +436,10 @@ export default function AdminSettings() {
 
             {showCleanupConfirm && (
               <div className="bg-red-100 border border-red-300 rounded-md p-4">
-                <h4 className="text-red-900 font-semibold mb-3">🔒 Confirm Database Cleanup</h4>
+                <h4 className="text-red-900 font-semibold mb-3 flex items-center">
+                  <LockIcon className="mr-2 h-4 w-4" />
+                  Confirm Database Cleanup
+                </h4>
                 <p className="text-red-800 text-sm mb-4">
                   Enter your admin password to confirm this destructive action:
                 </p>
@@ -472,7 +484,8 @@ export default function AdminSettings() {
                           <svg className="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
-                          🗑️ DELETE ALL DATA
+                          <DeleteIcon className="mr-2 h-4 w-4" />
+                          DELETE ALL DATA
                         </>
                       )}
                     </button>

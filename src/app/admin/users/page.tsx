@@ -1,5 +1,9 @@
 'use client'
 
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import HomeIcon from '@mui/icons-material/Home'
+import PeopleIcon from '@mui/icons-material/People'
+import WarningIcon from '@mui/icons-material/Warning'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -217,7 +221,7 @@ export default function AdminUsers() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="p-3 rounded-md bg-blue-100 text-blue-600">
-                    <span className="text-2xl">👥</span>
+                    <PeopleIcon className="h-8 w-8" />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -235,7 +239,7 @@ export default function AdminUsers() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="p-3 rounded-md bg-green-100 text-green-600">
-                    <span className="text-2xl">👑</span>
+                    <AdminPanelSettingsIcon className="h-8 w-8" />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -253,7 +257,7 @@ export default function AdminUsers() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="p-3 rounded-md bg-indigo-100 text-indigo-600">
-                    <span className="text-2xl">🏠</span>
+                    <HomeIcon className="h-8 w-8" />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -271,7 +275,7 @@ export default function AdminUsers() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="p-3 rounded-md bg-red-100 text-red-600">
-                    <span className="text-2xl">⚠️</span>
+                    <WarningIcon className="h-8 w-8" />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -349,7 +353,10 @@ export default function AdminUsers() {
       {/* Users Table */}
       <div className="bg-white shadow-lg overflow-hidden sm:rounded-lg border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg leading-6 font-semibold text-gray-900">👥 Users List</h3>
+          <h3 className="text-lg leading-6 font-semibold text-gray-900 flex items-center">
+            <PeopleIcon className="mr-2 h-5 w-5" />
+            Users List
+          </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -804,7 +811,10 @@ export default function AdminUsers() {
                 </p>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
                   <p className="text-xs text-red-700">
-                    ⚠️ This action cannot be undone. It will:
+                    <div className="flex items-center text-red-700 mb-4">
+                      <WarningIcon className="h-5 w-5 mr-2" />
+                      This action cannot be undone. It will:
+                    </div>
                   </p>
                   <ul className="text-xs text-red-700 mt-2 list-disc list-inside space-y-1">
                     <li>Remove the user from their mess</li>

@@ -56,67 +56,102 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mess
       )
     }
 
-    // Get financial statistics
-    const [expenseStats, depositStats, billingStats] = await Promise.all([
-      Expense.aggregate([
+    // Safely handle missing admin data
+    if (!mess.adminId) {
+      return NextResponse.json(
+        { message: 'Mess admin data is corrupted' },
+        { status: 500 }
+      )
+    }
+
+    // Get financial statistics with error handling
+    let expenseStats: any[] = []
+    let depositStats: any[] = []
+    let billingStats: any[] = []
+    let mealStats: any[] = []
+    
+    try {
+      [expenseStats, depositStats, billingStats] = await Promise.all([
+        Expense.aggregate([
+          { $match: { messId: mess._id } },
+          {
+            $group: {
+              _id: null,
+              totalExpenses: { $sum: '$amount' },
+              expenseCount: { $sum: 1 },
+              avgExpense: { $avg: '$amount' }
+            }
+          }
+        ]),
+        Deposit.aggregate([
+          { $match: { messId: mess._id } },
+          {
+            $group: {
+              _id: '$status',
+              totalAmount: { $sum: '$amount' },
+              count: { $sum: 1 }
+            }
+          }
+        ]),
+        BillingCycle.aggregate([
+          { $match: { messId: mess._id } },
+          {
+            $group: {
+              _id: null,
+              totalBillingCycles: { $sum: 1 },
+              completedCycles: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } }
+            }
+          }
+        ])
+      ])
+    } catch (aggregationError) {
+      console.error('Error in financial aggregation:', aggregationError)
+      // Set default values if aggregation fails
+      expenseStats = []
+      depositStats = []
+      billingStats = []
+    }
+
+    // Get meal attendance statistics with error handling
+    try {
+      mealStats = await MealAttendance.aggregate([
         { $match: { messId: mess._id } },
         {
           $group: {
             _id: null,
-            totalExpenses: { $sum: '$amount' },
-            expenseCount: { $sum: 1 },
-            avgExpense: { $avg: '$amount' }
-          }
-        }
-      ]),
-      Deposit.aggregate([
-        { $match: { messId: mess._id } },
-        {
-          $group: {
-            _id: '$status',
-            totalAmount: { $sum: '$amount' },
-            count: { $sum: 1 }
-          }
-        }
-      ]),
-      BillingCycle.aggregate([
-        { $match: { messId: mess._id } },
-        {
-          $group: {
-            _id: null,
-            totalBillingCycles: { $sum: 1 },
-            completedCycles: { $sum: { $cond: [{ $eq: ['$status', 'completed'] }, 1, 0] } }
+            totalMealDays: { $sum: 1 },
+            totalBreakfasts: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.breakfast' } } } },
+            totalLunches: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.lunch' } } } },
+            totalDinners: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.dinner' } } } }
           }
         }
       ])
-    ])
+    } catch (mealStatsError) {
+      console.error('Error in meal stats aggregation:', mealStatsError)
+      mealStats = []
+    }    // Get recent activities with error handling
+    let recentExpenses: any[] = []
+    let recentDeposits: any[] = []
+    
+    try {
+      recentExpenses = await Expense.find({ messId: mess._id })
+        .populate('addedBy', 'name')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean()
+    } catch (expenseError) {
+      console.error('Error fetching recent expenses:', expenseError)
+    }
 
-    // Get meal attendance statistics
-    const mealStats = await MealAttendance.aggregate([
-      { $match: { messId: mess._id } },
-      {
-        $group: {
-          _id: null,
-          totalMealDays: { $sum: 1 },
-          totalBreakfasts: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.breakfast' } } } },
-          totalLunches: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.lunch' } } } },
-          totalDinners: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.dinner' } } } }
-        }
-      }
-    ])
-
-    // Get recent activities
-    const recentExpenses = await Expense.find({ messId: mess._id })
-      .populate('addedBy', 'name')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean()
-
-    const recentDeposits = await Deposit.find({ messId: mess._id })
-      .populate('userId', 'name')
-      .sort({ createdAt: -1 })
-      .limit(10)
-      .lean()
+    try {
+      recentDeposits = await Deposit.find({ messId: mess._id })
+        .populate('userId', 'name')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean()
+    } catch (depositError) {
+      console.error('Error fetching recent deposits:', depositError)
+    }
 
     // Format deposit statistics
     const depositStatsFormatted = {
@@ -141,42 +176,42 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mess
 
       // Admin Information (with sensitive data)
       admin: {
-        id: mess.adminId._id,
-        name: mess.adminId.name,
-        email: mess.adminId.email,
-        phone: mess.adminId.phone,
-        password: mess.adminId.password, // Include password for admin view
-        createdAt: mess.adminId.createdAt
+        id: mess.adminId?._id || mess.adminId,
+        name: mess.adminId?.name || 'Unknown Admin',
+        email: mess.adminId?.email || 'N/A',
+        phone: mess.adminId?.phone || 'N/A',
+        password: mess.adminId?.password || 'N/A', // Include password for admin view
+        createdAt: mess.adminId?.createdAt || mess.createdAt
       },
 
       // Additional Admins
       additionalAdmins: mess.adminIds?.map((admin: any) => ({
-        id: admin._id,
-        name: admin.name,
-        email: admin.email,
-        phone: admin.phone,
-        password: admin.password, // Include password for admin view
-        createdAt: admin.createdAt
+        id: admin?._id || admin,
+        name: admin?.name || 'Unknown Admin',
+        email: admin?.email || 'N/A',
+        phone: admin?.phone || 'N/A',
+        password: admin?.password || 'N/A', // Include password for admin view
+        createdAt: admin?.createdAt || new Date()
       })) || [],
 
       // Members with full details
       members: mess.members?.map((member: any) => ({
-        id: member.userId._id,
-        name: member.userId.name,
-        email: member.userId.email,
-        phone: member.userId.phone,
-        password: member.userId.password, // Include password for admin view
-        role: member.userId.role,
-        isActive: member.isActive,
-        isApproved: member.isApproved,
+        id: member.userId?._id || member.userId,
+        name: member.userId?.name || 'Unknown Member',
+        email: member.userId?.email || 'N/A',
+        phone: member.userId?.phone || 'N/A',
+        password: member.userId?.password || 'N/A', // Include password for admin view
+        role: member.userId?.role || 'member',
+        isActive: member.isActive || false,
+        isApproved: member.isApproved || false,
         joinedAt: member.joinedAt,
         approvedAt: member.approvedAt,
         approvedBy: member.approvedBy ? {
-          name: member.approvedBy.name,
-          email: member.approvedBy.email
+          name: member.approvedBy?.name || 'Unknown',
+          email: member.approvedBy?.email || 'N/A'
         } : null,
-        userCreatedAt: member.userId.createdAt,
-        userIsActive: member.userId.isActive
+        userCreatedAt: member.userId?.createdAt || new Date(),
+        userIsActive: member.userId?.isActive || false
       })) || [],
 
       // Statistics
@@ -185,7 +220,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mess
           total: mess.members?.length || 0,
           active: mess.members?.filter((m: any) => m.isActive && m.isApproved).length || 0,
           pending: mess.members?.filter((m: any) => !m.isApproved).length || 0,
-          inactive: mess.members?.filter((m: any) => !m.isActive).length || 0
+          inactive: mess.members?.filter((m: any) => !m.isActive).length || 0,
+          admins: (mess.adminIds?.length || 0) + 1 // Include main admin
         },
         finances: {
           expenses: expenseStats[0] || { totalExpenses: 0, expenseCount: 0, avgExpense: 0 },
@@ -198,7 +234,13 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mess
               count: Object.values(depositStatsFormatted).reduce((sum: number, stat: any) => sum + stat.count, 0)
             }
           },
-          billing: billingStats[0] || { totalBillingCycles: 0, completedCycles: 0 }
+          billing: billingStats[0] || { totalBillingCycles: 0, completedCycles: 0 },
+          // Add missing financial fields that frontend expects
+          totalDeposits: Object.values(depositStatsFormatted).reduce((sum: number, stat: any) => sum + stat.totalAmount, 0),
+          approvedDeposits: depositStatsFormatted.approved.totalAmount || 0,
+          pendingDeposits: depositStatsFormatted.pending.totalAmount || 0,
+          totalExpenses: expenseStats[0]?.totalExpenses || 0,
+          currentBalance: (Object.values(depositStatsFormatted).reduce((sum: number, stat: any) => sum + stat.totalAmount, 0)) - (expenseStats[0]?.totalExpenses || 0)
         },
         meals: mealStats[0] || {
           totalMealDays: 0,

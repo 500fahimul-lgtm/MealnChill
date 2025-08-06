@@ -1,5 +1,11 @@
 'use client'
 
+import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings'
+import HomeIcon from '@mui/icons-material/Home'
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty'
+import PeopleIcon from '@mui/icons-material/People'
+import PersonIcon from '@mui/icons-material/Person'
+import WarningIcon from '@mui/icons-material/Warning'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -222,7 +228,7 @@ export default function AdminMesses() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="p-3 rounded-md bg-indigo-100 text-indigo-600">
-                    <span className="text-2xl">🏠</span>
+                    <HomeIcon className="h-8 w-8" />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -239,7 +245,7 @@ export default function AdminMesses() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="p-3 rounded-md bg-green-100 text-green-600">
-                    <span className="text-2xl">👥</span>
+                    <PeopleIcon className="h-8 w-8" />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -258,7 +264,7 @@ export default function AdminMesses() {
               <div className="flex items-center">
                 <div className="flex-shrink-0">
                   <div className="p-3 rounded-md bg-yellow-100 text-yellow-600">
-                    <span className="text-2xl">⏳</span>
+                    <HourglassEmptyIcon className="h-8 w-8" />
                   </div>
                 </div>
                 <div className="ml-5 w-0 flex-1">
@@ -307,7 +313,10 @@ export default function AdminMesses() {
       {/* Messes Table */}
       <div className="bg-white shadow-lg overflow-hidden sm:rounded-lg border border-gray-200">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg leading-6 font-semibold text-gray-900">🏠 Messes List</h3>
+          <h3 className="text-lg leading-6 font-semibold text-gray-900 flex items-center">
+            <HomeIcon className="mr-2 h-5 w-5" />
+            Messes List
+          </h3>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -490,8 +499,8 @@ export default function AdminMesses() {
                         </span>
                       </div>
                       <div className="border-t border-blue-200 pt-3 space-y-1 text-xs">
-                        <div className="flex justify-between"><span className="text-gray-600">Created:</span> <span className="text-gray-700">{new Date(messDetails.createdAt).toLocaleDateString()}</span></div>
-                        <div className="flex justify-between"><span className="text-gray-600">Updated:</span> <span className="text-gray-700">{new Date(messDetails.updatedAt).toLocaleDateString()}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Created:</span> <span className="text-gray-700">{messDetails.createdAt ? new Date(messDetails.createdAt).toLocaleDateString() : 'N/A'}</span></div>
+                        <div className="flex justify-between"><span className="text-gray-600">Updated:</span> <span className="text-gray-700">{messDetails.updatedAt ? new Date(messDetails.updatedAt).toLocaleDateString() : 'N/A'}</span></div>
                       </div>
                     </div>
                   </div>
@@ -520,7 +529,7 @@ export default function AdminMesses() {
                           <div className="text-xs text-gray-600">Pending</div>
                         </div>
                         <div className="bg-white p-3 rounded-lg text-center">
-                          <div className="text-lg font-bold text-purple-600">{messDetails.statistics.members.admins}</div>
+                          <div className="text-lg font-bold text-purple-600">{messDetails.statistics?.members?.admins || 0}</div>
                           <div className="text-xs text-gray-600">Admins</div>
                         </div>
                       </div>
@@ -538,24 +547,27 @@ export default function AdminMesses() {
                       <div className="bg-white p-3 rounded-lg">
                         <div className="flex justify-between mb-2">
                           <span className="text-gray-600">Total Deposits</span>
-                          <span className="font-bold text-gray-800">৳{messDetails.statistics.finances.totalDeposits}</span>
+                          <span className="font-bold text-gray-800">৳{messDetails.statistics?.finances?.totalDeposits || 0}</span>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-xs">
-                          <div className="text-green-600">✓ Approved: ৳{messDetails.statistics.finances.approvedDeposits}</div>
-                          <div className="text-yellow-600">⏳ Pending: ৳{messDetails.statistics.finances.pendingDeposits}</div>
+                          <div className="text-green-600">✓ Approved: ৳{messDetails.statistics?.finances?.approvedDeposits || 0}</div>
+                          <div className="text-yellow-600 flex items-center">
+                            <HourglassEmptyIcon className="h-4 w-4 mr-1" />
+                            Pending: ৳{messDetails.statistics?.finances?.pendingDeposits || 0}
+                          </div>
                         </div>
                       </div>
                       <div className="bg-white p-3 rounded-lg">
                         <div className="flex justify-between mb-2">
                           <span className="text-gray-600">Total Expenses</span>
-                          <span className="font-bold text-red-600">৳{messDetails.statistics.finances.totalExpenses}</span>
+                          <span className="font-bold text-red-600">৳{messDetails.statistics?.finances?.totalExpenses || 0}</span>
                         </div>
                       </div>
                       <div className="bg-white p-3 rounded-lg">
                         <div className="flex justify-between">
                           <span className="text-gray-700 font-medium">Current Balance</span>
-                          <span className={`font-bold ${messDetails.statistics.finances.currentBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                            ৳{messDetails.statistics.finances.currentBalance}
+                          <span className={`font-bold ${(messDetails.statistics?.finances?.currentBalance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            ৳{messDetails.statistics?.finances?.currentBalance || 0}
                           </span>
                         </div>
                       </div>
@@ -572,20 +584,24 @@ export default function AdminMesses() {
                     Meal Schedule & Deadlines
                   </h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {messDetails.mealFrequency === 3 && (
+                    {messDetails.mealFrequency === 3 && messDetails.mealDeadlines?.breakfast && (
                       <div className="bg-yellow-50 p-4 rounded-lg text-center border border-yellow-200">
                         <div className="text-yellow-800 font-semibold mb-2">🌅 Breakfast</div>
                         <div className="text-gray-800 font-mono text-lg">{messDetails.mealDeadlines.breakfast}</div>
                       </div>
                     )}
-                    <div className="bg-green-50 p-4 rounded-lg text-center border border-green-200">
-                      <div className="text-green-800 font-semibold mb-2">🌞 Lunch</div>
-                      <div className="text-gray-800 font-mono text-lg">{messDetails.mealDeadlines.lunch}</div>
-                    </div>
-                    <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
-                      <div className="text-blue-800 font-semibold mb-2">🌙 Dinner</div>
-                      <div className="text-gray-800 font-mono text-lg">{messDetails.mealDeadlines.dinner}</div>
-                    </div>
+                    {messDetails.mealDeadlines?.lunch && (
+                      <div className="bg-green-50 p-4 rounded-lg text-center border border-green-200">
+                        <div className="text-green-800 font-semibold mb-2">🌞 Lunch</div>
+                        <div className="text-gray-800 font-mono text-lg">{messDetails.mealDeadlines.lunch}</div>
+                      </div>
+                    )}
+                    {messDetails.mealDeadlines?.dinner && (
+                      <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
+                        <div className="text-blue-800 font-semibold mb-2">🌙 Dinner</div>
+                        <div className="text-gray-800 font-mono text-lg">{messDetails.mealDeadlines.dinner}</div>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -599,16 +615,18 @@ export default function AdminMesses() {
                       Recent Meal Activities
                     </h4>
                     <div className="max-h-64 overflow-y-auto">
-                      {messDetails.recentActivities.meals.length > 0 ? (
+                      {messDetails.recentActivities?.expenses?.length > 0 ? (
                         <div className="space-y-3">
-                          {messDetails.recentActivities.meals.map((meal: any, index: number) => (
-                            <div key={index} className="flex justify-between items-center text-sm border-b border-gray-200 pb-3">
-                              <span className="font-medium text-gray-800">{new Date(meal.date).toLocaleDateString()}</span>
+                          {messDetails.recentActivities.expenses.slice(0, 5).map((expense: any, index: number) => (
+                            <div key={expense.id || index} className="flex justify-between items-center text-sm border-b border-gray-200 pb-3">
+                              <div>
+                                <div className="font-medium text-gray-800">{expense.title || 'Expense'}</div>
+                                <div className="text-gray-600 text-xs">{expense.category || 'General'}</div>
+                              </div>
                               <div className="text-right">
-                                <div className="font-semibold text-gray-800">Total: {meal.totalMeals} meals</div>
-                                <div className="text-gray-600 text-xs mt-1">
-                                  B: {meal.breakfast || 0}, L: {meal.lunch || 0}, D: {meal.dinner || 0}
-                                </div>
+                                <div className="font-semibold text-gray-800">৳{expense.amount || 0}</div>
+                                <div className="text-gray-600 text-xs">{expense.addedBy || 'Unknown'}</div>
+                                <div className="text-gray-500 text-xs">{expense.createdAt ? new Date(expense.createdAt).toLocaleDateString() : 'N/A'}</div>
                               </div>
                             </div>
                           ))}
@@ -632,17 +650,24 @@ export default function AdminMesses() {
                       Recent Financial Activities
                     </h4>
                     <div className="max-h-64 overflow-y-auto">
-                      {messDetails.recentActivities.finances.length > 0 ? (
+                      {messDetails.recentActivities?.deposits?.length > 0 ? (
                         <div className="space-y-3">
-                          {messDetails.recentActivities.finances.map((activity: any) => (
-                            <div key={activity.id} className="flex justify-between items-center text-sm border-b border-gray-200 pb-3">
+                          {messDetails.recentActivities.deposits.slice(0, 5).map((deposit: any) => (
+                            <div key={deposit.id} className="flex justify-between items-center text-sm border-b border-gray-200 pb-3">
                               <div>
-                                <div className="font-semibold text-gray-800">৳{activity.amount}</div>
-                                <div className="text-gray-600 text-xs">{activity.type}</div>
+                                <div className="font-semibold text-gray-800">৳{deposit.amount || 0}</div>
+                                <div className="text-gray-600 text-xs">{deposit.method || 'Deposit'}</div>
                               </div>
                               <div className="text-right">
-                                <div className="text-gray-600 text-xs">{new Date(activity.date).toLocaleDateString()}</div>
-                                <div className="text-gray-700 text-xs">{activity.description}</div>
+                                <div className="text-gray-600 text-xs">{deposit.createdAt ? new Date(deposit.createdAt).toLocaleDateString() : 'N/A'}</div>
+                                <div className="text-gray-700 text-xs">{deposit.user || 'Unknown'}</div>
+                                <div className={`text-xs px-2 py-1 rounded-full ${
+                                  deposit.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                  deposit.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {deposit.status || 'pending'}
+                                </div>
                               </div>
                             </div>
                           ))}
@@ -679,23 +704,33 @@ export default function AdminMesses() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {messDetails.members.map((member: any) => (
-                          <tr key={member.user._id} className="hover:bg-gray-50 transition-colors duration-150">
+                        {messDetails.members?.map((member: any) => (
+                          <tr key={member.id} className="hover:bg-gray-50 transition-colors duration-150">
                             <td className="px-4 py-3 text-sm">
-                              <div className="font-medium text-gray-800">{member.user.name}</div>
-                              <div className="text-gray-600 text-xs font-mono">ID: {member.user._id.slice(-8)}</div>
+                              <div className="font-medium text-gray-800">{member.name || 'Unknown'}</div>
+                              <div className="text-gray-600 text-xs font-mono">ID: {member.id?.toString().slice(-8) || 'N/A'}</div>
                             </td>
                             <td className="px-4 py-3 text-sm">
-                              <div className="text-gray-800">{member.user.email}</div>
-                              <div className="text-gray-600 text-xs">{member.user.phone}</div>
+                              <div className="text-gray-800">{member.email || 'N/A'}</div>
+                              <div className="text-gray-600 text-xs">{member.phone || 'N/A'}</div>
                             </td>
                             <td className="px-4 py-3 text-sm">
-                              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                member.isMessAdmin 
+                              <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full items-center ${
+                                member.role === 'admin'
                                   ? 'bg-purple-100 text-purple-800'
                                   : 'bg-gray-100 text-gray-800'
                               }`}>
-                                {member.isMessAdmin ? '👑 Admin' : '👤 Member'}
+                                {member.role === 'admin' ? (
+                                  <>
+                                    <AdminPanelSettingsIcon className="h-3 w-3 mr-1" />
+                                    Admin
+                                  </>
+                                ) : (
+                                  <>
+                                    <PersonIcon className="h-3 w-3 mr-1" />
+                                    Member
+                                  </>
+                                )}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-sm">
@@ -710,7 +745,7 @@ export default function AdminMesses() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-700">
-                              {new Date(member.joinedAt).toLocaleDateString()}
+                              {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : 'N/A'}
                             </td>
                           </tr>
                         ))}
@@ -754,11 +789,15 @@ export default function AdminMesses() {
                       Meal Deadlines
                     </h4>
                     <div className="space-y-3 text-sm">
-                      {selectedMess.mealFrequency === 3 && (
+                      {selectedMess.mealFrequency === 3 && selectedMess.mealDeadlines?.breakfast && (
                         <div className="flex justify-between"><span className="font-medium text-gray-700">🌅 Breakfast:</span> <span className="text-gray-800 font-mono">{selectedMess.mealDeadlines.breakfast}</span></div>
                       )}
-                      <div className="flex justify-between"><span className="font-medium text-gray-700">🌞 Lunch:</span> <span className="text-gray-800 font-mono">{selectedMess.mealDeadlines.lunch}</span></div>
-                      <div className="flex justify-between"><span className="font-medium text-gray-700">🌙 Dinner:</span> <span className="text-gray-800 font-mono">{selectedMess.mealDeadlines.dinner}</span></div>
+                      {selectedMess.mealDeadlines?.lunch && (
+                        <div className="flex justify-between"><span className="font-medium text-gray-700">🌞 Lunch:</span> <span className="text-gray-800 font-mono">{selectedMess.mealDeadlines.lunch}</span></div>
+                      )}
+                      {selectedMess.mealDeadlines?.dinner && (
+                        <div className="flex justify-between"><span className="font-medium text-gray-700">🌙 Dinner:</span> <span className="text-gray-800 font-mono">{selectedMess.mealDeadlines.dinner}</span></div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -781,10 +820,10 @@ export default function AdminMesses() {
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
-                        {selectedMess.members.map((member) => (
-                          <tr key={member.user._id} className="hover:bg-gray-50 transition-colors duration-150">
-                            <td className="px-4 py-3 text-sm font-medium text-gray-800">{member.user.name}</td>
-                            <td className="px-4 py-3 text-sm text-gray-700">{member.user.email}</td>
+                        {selectedMess.members?.map((member: any) => (
+                          <tr key={member.user?._id || member._id} className="hover:bg-gray-50 transition-colors duration-150">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-800">{member.user?.name || member.name || 'Unknown'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-700">{member.user?.email || member.email || 'N/A'}</td>
                             <td className="px-4 py-3 text-sm">
                               <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                                 !member.isApproved 
@@ -797,7 +836,7 @@ export default function AdminMesses() {
                               </span>
                             </td>
                             <td className="px-4 py-3 text-sm text-gray-700">
-                              {new Date(member.joinedAt).toLocaleDateString()}
+                              {member.joinedAt ? new Date(member.joinedAt).toLocaleDateString() : 'N/A'}
                             </td>
                           </tr>
                         ))}
@@ -847,7 +886,10 @@ export default function AdminMesses() {
                 </p>
                 <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
                   <p className="text-xs text-red-700 mb-2">
-                    ⚠️ This is a destructive action that cannot be undone. It will:
+                    <div className="flex items-center text-red-700 mb-4">
+                      <WarningIcon className="h-5 w-5 mr-2" />
+                      This is a destructive action that cannot be undone. It will:
+                    </div>
                   </p>
                   <ul className="text-xs text-red-700 space-y-1 list-disc list-inside">
                     <li>Remove <strong>all {messToDelete.totalMembers} members</strong> from the mess</li>
