@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any
-    const admin = await WebAdmin.findById(decoded.userId)
+    const admin = await WebAdmin.findById(decoded.adminId)
     
     if (!admin) {
       return NextResponse.json({ error: 'Invalid admin token' }, { status: 401 })

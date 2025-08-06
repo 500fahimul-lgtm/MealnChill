@@ -1,5 +1,6 @@
 'use client'
 
+import { useAdminAuth } from '@/lib/useAdminAuth'
 import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -10,10 +11,10 @@ interface AdminLayoutProps {
 }
 
 export default function AdminLayout({ children }: AdminLayoutProps) {
-  const [adminData, setAdminData] = useState<any>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const { adminData, isLoading, isAuthenticated, logout } = useAdminAuth()
 
   useEffect(() => {
     // Don't check authentication for the login page
@@ -21,27 +22,11 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       return
     }
 
-    const token = localStorage.getItem('adminToken')
-    const admin = localStorage.getItem('adminData')
-
-    if (!token || !admin) {
-      router.push('/admin')
-      return
-    }
-
-    try {
-      setAdminData(JSON.parse(admin))
-    } catch (error) {
-      console.error('Error parsing admin data:', error)
+    // If not loading and not authenticated, redirect to login
+    if (!isLoading && !isAuthenticated) {
       router.push('/admin')
     }
-  }, [router, pathname])
-
-  const handleLogout = () => {
-    localStorage.removeItem('adminToken')
-    localStorage.removeItem('adminData')
-    router.push('/admin')
-  }
+  }, [pathname, isLoading, isAuthenticated, router])
 
   const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: '📊' },
@@ -55,7 +40,20 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     return <>{children}</>
   }
 
-  if (!adminData) {
+  // Show loading while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Verifying authentication...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show loading if not authenticated (will redirect)
+  if (!isAuthenticated || !adminData) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -85,7 +83,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
                 </svg>
               </button>
             </div>
-            <SidebarContent navigation={navigation} pathname={pathname} onLogout={handleLogout} adminData={adminData} />
+            <SidebarContent navigation={navigation} pathname={pathname} onLogout={logout} adminData={adminData} />
           </div>
         </div>
       )}
@@ -93,7 +91,7 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
       {/* Static sidebar for desktop */}
       <div className="hidden lg:flex lg:flex-shrink-0 lg:fixed lg:inset-y-0">
         <div className="flex flex-col w-64">
-          <SidebarContent navigation={navigation} pathname={pathname} onLogout={handleLogout} adminData={adminData} />
+          <SidebarContent navigation={navigation} pathname={pathname} onLogout={logout} adminData={adminData} />
         </div>
       </div>
 

@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
       lastLogin: admin.lastLogin
     }
 
-    return NextResponse.json(
+    // Create response with secure cookies
+    const response = NextResponse.json(
       { 
         message: 'Login successful',
         token,
@@ -89,6 +90,23 @@ export async function POST(req: NextRequest) {
       },
       { status: 200 }
     )
+
+    // Set secure httpOnly cookies for server-side middleware
+    response.cookies.set('adminToken', token, {
+      httpOnly: false, // Need to be accessible to client for API calls
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 // 24 hours
+    })
+
+    response.cookies.set('adminData', JSON.stringify(adminData), {
+      httpOnly: false, // Need to be accessible to client
+      secure: process.env.NODE_ENV === 'production', 
+      sameSite: 'strict',
+      maxAge: 24 * 60 * 60 // 24 hours
+    })
+
+    return response
   } catch (error) {
     console.error('Web Admin login error:', error)
     return NextResponse.json(
