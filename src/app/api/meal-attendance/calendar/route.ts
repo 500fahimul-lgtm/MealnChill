@@ -138,12 +138,14 @@ export async function GET(request: NextRequest) {
           extra: record.extraMealCount || 0
         }
       }
-      
-      // Recalculate total meals
+    })
+
+    // Recalculate total meals for all entries after processing all records
+    dataMap.forEach((dayData) => {
       dayData.totalMeals = 
-        (dayData.breakfast.status ? 1 : 0) + dayData.breakfast.extra +
-        (dayData.lunch.status ? 1 : 0) + dayData.lunch.extra +
-        (dayData.dinner.status ? 1 : 0) + dayData.dinner.extra
+        (dayData.breakfast.status ? 1 : 0) + (dayData.breakfast.extra || 0) +
+        (dayData.lunch.status ? 1 : 0) + (dayData.lunch.extra || 0) +
+        (dayData.dinner.status ? 1 : 0) + (dayData.dinner.extra || 0)
     })
 
     // Convert map to array
