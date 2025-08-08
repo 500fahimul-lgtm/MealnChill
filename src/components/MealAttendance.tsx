@@ -104,7 +104,7 @@ interface MealAttendanceProps {
 }
 
 interface Member {
-  userId: string
+  id: string
   name: string
   email: string
   isActive: boolean
@@ -1355,7 +1355,7 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                   >
                     <option value="all">All Members</option>
                     {members.map((member) => (
-                      <option key={member.userId} value={member.userId}>
+                      <option key={member.id} value={member.id}>
                         {member.name}
                       </option>
                     ))}
