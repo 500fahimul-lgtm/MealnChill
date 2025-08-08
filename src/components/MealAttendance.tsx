@@ -162,33 +162,45 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
 
   // Helper functions for meal calendar
   const getDateRange = () => {
+    // Use Bangladesh timezone for consistency with API
     const today = new Date()
+    const bangladeshOffset = 6 * 60 // Bangladesh is UTC+6
+    const bangladeshTime = new Date(today.getTime() + (bangladeshOffset * 60 * 1000))
+    
     let startDate: string
     let endDate: string
 
     switch (calendarDateRange) {
       case 'week':
         // Get last 7 days
-        const weekStart = new Date(today)
-        weekStart.setDate(today.getDate() - 6)
+        const weekStart = new Date(bangladeshTime)
+        weekStart.setDate(bangladeshTime.getDate() - 6)
         startDate = weekStart.toISOString().split('T')[0]
-        endDate = today.toISOString().split('T')[0]
+        endDate = bangladeshTime.toISOString().split('T')[0]
         break
       case 'month':
         // Get last 30 days
-        const monthStart = new Date(today)
-        monthStart.setDate(today.getDate() - 29)
+        const monthStart = new Date(bangladeshTime)
+        monthStart.setDate(bangladeshTime.getDate() - 29)
         startDate = monthStart.toISOString().split('T')[0]
-        endDate = today.toISOString().split('T')[0]
+        endDate = bangladeshTime.toISOString().split('T')[0]
         break
       case 'custom':
-        startDate = customStartDate || today.toISOString().split('T')[0]
-        endDate = customEndDate || today.toISOString().split('T')[0]
+        startDate = customStartDate || bangladeshTime.toISOString().split('T')[0]
+        endDate = customEndDate || bangladeshTime.toISOString().split('T')[0]
         break
       default:
-        startDate = today.toISOString().split('T')[0]
-        endDate = today.toISOString().split('T')[0]
+        startDate = bangladeshTime.toISOString().split('T')[0]
+        endDate = bangladeshTime.toISOString().split('T')[0]
     }
+
+    console.log('📅 Frontend date range calculation:', { 
+      calendarDateRange, 
+      startDate, 
+      endDate,
+      bangladeshTime: bangladeshTime.toISOString(),
+      utcTime: today.toISOString()
+    })
 
     return { startDate, endDate }
   }
