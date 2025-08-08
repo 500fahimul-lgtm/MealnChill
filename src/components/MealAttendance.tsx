@@ -224,21 +224,37 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         apiUrl += `&userId=${selectedMember}`
       }
       
+      console.log('🔄 Fetching calendar data:', { apiUrl, startDate, endDate, selectedMember })
+      
       const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       })
       
+      console.log('📡 API Response:', { status: response.status, ok: response.ok })
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('📊 Calendar data received:', { 
+          success: data.success, 
+          dataLength: data.calendarData?.length || 0,
+          sampleData: data.calendarData?.slice(0, 2) || []
+        })
         setMealCalendarData(data.calendarData || [])
+        if (data.calendarData?.length > 0) {
+          showToast(`Loaded ${data.calendarData.length} meal records`, 'success')
+        } else {
+          showToast('No meal data found for the selected period', 'info')
+        }
       } else {
-        showToast('Error fetching meal calendar data', 'error')
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
+        console.error('❌ API Error:', errorData)
+        showToast(`Error fetching meal calendar data: ${errorData.error || 'Unknown error'}`, 'error')
       }
     } catch (error) {
-      console.error('Error fetching meal calendar data:', error)
-      showToast('Error loading meal calendar', 'error')
+      console.error('❌ Network Error:', error)
+      showToast(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     } finally {
       setIsLoadingCalendar(false)
     }
