@@ -31,6 +31,10 @@ export async function GET(request: NextRequest) {
     // Connect to database
     await connectDB()
 
+    // Quick check - do we have any meal attendance data at all?
+    const totalMealRecords = await MealAttendance.countDocuments()
+    console.log('📊 Database check - Total meal attendance records:', totalMealRecords)
+
     // Get user's mess information
     const user = await User.findById(decoded.userId).populate('messId')
     if (!user || !user.messId) {
@@ -60,7 +64,14 @@ export async function GET(request: NextRequest) {
     const startDateObj = new Date(startDate + 'T00:00:00+06:00')
     const endDateObj = new Date(endDate + 'T23:59:59+06:00')
 
-    console.log('📅 Date range:', { startDate, endDate, startDateObj, endDateObj })
+    console.log('📅 Date range conversion:', { 
+      startDate, 
+      endDate, 
+      startDateObj: startDateObj.toISOString(), 
+      endDateObj: endDateObj.toISOString(),
+      startDateObjLocal: startDateObj.toString(),
+      endDateObjLocal: endDateObj.toString()
+    })
 
     // Create date range filter
     const dateFilter = {
@@ -93,7 +104,7 @@ export async function GET(request: NextRequest) {
       ...userFilter
     }
 
-    console.log('🔍 Combined filter:', combinedFilter)
+    console.log('🔍 Combined filter:', JSON.stringify(combinedFilter, null, 2))
 
     // Fetch meal attendance data
     const attendanceData = await MealAttendance.find(combinedFilter)
@@ -103,12 +114,25 @@ export async function GET(request: NextRequest) {
 
     console.log('📊 Query results:', { 
       totalRecords: attendanceData.length,
+      filterUsed: combinedFilter,
       sampleRecords: attendanceData.slice(0, 3).map(record => ({
         date: record.date,
+        dateString: record.date?.toISOString?.() || 'No date',
         userId: record.userId,
         mealSlot: record.mealSlot,
         isMealOn: record.isMealOn
       }))
+    })
+
+    // Also check what data exists in the date range
+    const totalInRange = await MealAttendance.countDocuments(dateFilter)
+    const totalForUsers = await MealAttendance.countDocuments(userFilter)
+    
+    console.log('🔍 Data existence check:', {
+      totalInDateRange: totalInRange,
+      totalForUsers: totalForUsers,
+      dateFilter,
+      userFilter
     })
 
     // Get all users for name mapping
