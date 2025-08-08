@@ -51,6 +51,7 @@ export async function GET(request: NextRequest) {
 
     // Validate date parameters
     if (!startDate || !endDate) {
+      console.log('❌ Missing date parameters:', { startDate, endDate })
       return NextResponse.json({ error: 'Start date and end date are required' }, { status: 400 })
     }
 
@@ -75,7 +76,12 @@ export async function GET(request: NextRequest) {
       userFilter = { userId: userId }
       console.log('👤 Single user filter:', userFilter)
     } else {
-      // Get all active members of the mess
+      // Get all active members of the mess - add safety check
+      if (!mess.members || !Array.isArray(mess.members)) {
+        console.log('❌ Mess has no members array:', { members: mess.members })
+        return NextResponse.json({ error: 'Mess has no members' }, { status: 400 })
+      }
+      
       const activeMembers = mess.members.filter((member: any) => member.isActive).map((member: any) => member.userId)
       userFilter = { userId: { $in: activeMembers } }
       console.log('👥 All members filter:', { activeMembers: activeMembers.length, userFilter })
