@@ -11,51 +11,34 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get('endDate')
     const userId = searchParams.get('userId') // Optional - for specific user, 'all' for all users
 
-    console.log('🔍 Calendar API Debug:', { startDate, endDate, userId })
-
     // Verify token and get user info
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
-      console.log('❌ No token provided')
       return NextResponse.json({ error: 'No token provided' }, { status: 401 })
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as any
     if (!decoded) {
-      console.log('❌ Invalid token')
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
-
-    console.log('✅ Token verified for user:', decoded.userId)
 
     // Connect to database
     await connectDB()
 
-    // Quick check - do we have any meal attendance data at all?
-    const totalMealRecords = await MealAttendance.countDocuments()
-    console.log('📊 Database check - Total meal attendance records:', totalMealRecords)
-
     // Get user's mess information
     const user = await User.findById(decoded.userId).populate('messId')
     if (!user || !user.messId) {
-      console.log('❌ User not in any mess:', { userId: decoded.userId, hasMessId: !!user?.messId })
       return NextResponse.json({ error: 'User not in any mess' }, { status: 400 })
     }
-
-    console.log('✅ User found with mess:', { userId: user._id, messId: user.messId._id })
 
     // Get mess information
     const mess = user.messId as any
     if (!mess) {
-      console.log('❌ Mess not found')
       return NextResponse.json({ error: 'Mess not found' }, { status: 404 })
     }
 
-    console.log('✅ Mess found:', { messId: mess._id, membersCount: mess.members?.length })
-
     // Validate date parameters
     if (!startDate || !endDate) {
-      console.log('❌ Missing date parameters:', { startDate, endDate })
       return NextResponse.json({ error: 'Start date and end date are required' }, { status: 400 })
     }
 
@@ -63,15 +46,6 @@ export async function GET(request: NextRequest) {
     // Frontend sends dates in YYYY-MM-DD format, treat as Bangladesh timezone
     const startDateObj = new Date(startDate + 'T00:00:00+06:00')
     const endDateObj = new Date(endDate + 'T23:59:59+06:00')
-
-    console.log('📅 Date range conversion:', { 
-      startDate, 
-      endDate, 
-      startDateObj: startDateObj.toISOString(), 
-      endDateObj: endDateObj.toISOString(),
-      startDateObjLocal: startDateObj.toString(),
-      endDateObjLocal: endDateObj.toString()
-    })
 
     // Create date range filter
     const dateFilter = {
@@ -85,17 +59,14 @@ export async function GET(request: NextRequest) {
     let userFilter = {}
     if (userId && userId !== 'all') {
       userFilter = { userId: userId }
-      console.log('👤 Single user filter:', userFilter)
     } else {
       // Get all active members of the mess - add safety check
       if (!mess.members || !Array.isArray(mess.members)) {
-        console.log('❌ Mess has no members array:', { members: mess.members })
         return NextResponse.json({ error: 'Mess has no members' }, { status: 400 })
       }
       
       const activeMembers = mess.members.filter((member: any) => member.isActive).map((member: any) => member.userId)
       userFilter = { userId: { $in: activeMembers } }
-      console.log('👥 All members filter:', { activeMembers: activeMembers.length, userFilter })
     }
 
     // Combine filters
@@ -104,36 +75,11 @@ export async function GET(request: NextRequest) {
       ...userFilter
     }
 
-    console.log('🔍 Combined filter:', JSON.stringify(combinedFilter, null, 2))
-
     // Fetch meal attendance data
     const attendanceData = await MealAttendance.find(combinedFilter)
       .populate('userId', 'name email')
       .sort({ date: -1, userId: 1 })
       .lean()
-
-    console.log('📊 Query results:', { 
-      totalRecords: attendanceData.length,
-      filterUsed: combinedFilter,
-      sampleRecords: attendanceData.slice(0, 3).map(record => ({
-        date: record.date,
-        dateString: record.date?.toISOString?.() || 'No date',
-        userId: record.userId,
-        mealSlot: record.mealSlot,
-        isMealOn: record.isMealOn
-      }))
-    })
-
-    // Also check what data exists in the date range
-    const totalInRange = await MealAttendance.countDocuments(dateFilter)
-    const totalForUsers = await MealAttendance.countDocuments(userFilter)
-    
-    console.log('🔍 Data existence check:', {
-      totalInDateRange: totalInRange,
-      totalForUsers: totalForUsers,
-      dateFilter,
-      userFilter
-    })
 
     // Get all users for name mapping
     const allUsers = await User.find(
@@ -141,8 +87,6 @@ export async function GET(request: NextRequest) {
         ? { _id: userId }
         : { _id: { $in: mess.members.filter((m: any) => m.isActive).map((m: any) => m.userId) } }
     ).select('_id name email').lean()
-
-    console.log('👥 Users found:', { totalUsers: allUsers.length })
 
     const userMap = new Map()
     allUsers.forEach((user: any) => {

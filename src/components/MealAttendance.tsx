@@ -194,14 +194,6 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         endDate = bangladeshTime.toISOString().split('T')[0]
     }
 
-    console.log('📅 Frontend date range calculation:', { 
-      calendarDateRange, 
-      startDate, 
-      endDate,
-      bangladeshTime: bangladeshTime.toISOString(),
-      utcTime: today.toISOString()
-    })
-
     return { startDate, endDate }
   }
 
@@ -236,23 +228,14 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         apiUrl += `&userId=${selectedMember}`
       }
       
-      console.log('🔄 Fetching calendar data:', { apiUrl, startDate, endDate, selectedMember })
-      
       const response = await fetch(apiUrl, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       })
       
-      console.log('📡 API Response:', { status: response.status, ok: response.ok })
-      
       if (response.ok) {
         const data = await response.json()
-        console.log('📊 Calendar data received:', { 
-          success: data.success, 
-          dataLength: data.calendarData?.length || 0,
-          sampleData: data.calendarData?.slice(0, 2) || []
-        })
         setMealCalendarData(data.calendarData || [])
         if (data.calendarData?.length > 0) {
           showToast(`Loaded ${data.calendarData.length} meal records`, 'success')
@@ -261,11 +244,9 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        console.error('❌ API Error:', errorData)
         showToast(`Error fetching meal calendar data: ${errorData.error || 'Unknown error'}`, 'error')
       }
     } catch (error) {
-      console.error('❌ Network Error:', error)
       showToast(`Network error: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error')
     } finally {
       setIsLoadingCalendar(false)
