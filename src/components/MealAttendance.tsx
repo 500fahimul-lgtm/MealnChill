@@ -1,22 +1,26 @@
 'use client'
 
 import {
-    AccessTime,
-    AdminPanelSettings,
-    Assignment,
-    BarChart,
-    Block,
-    CheckCircle,
-    Close,
-    Email,
-    GpsFixed,
-    HourglassTop,
-    Info,
-    Kitchen,
-    Restaurant,
-    Save,
-    Undo,
-    Warning
+  AccessTime,
+  AdminPanelSettings,
+  Assignment,
+  BarChart,
+  Block,
+  CalendarMonth,
+  CheckCircle,
+  Close,
+  DateRange,
+  Email,
+  GpsFixed,
+  HourglassTop,
+  Info,
+  Kitchen,
+  Person,
+  Restaurant,
+  Save,
+  TableChart,
+  Undo,
+  Warning
 } from '@mui/icons-material'
 import { useCallback, useEffect, useState } from 'react'
 
@@ -99,6 +103,23 @@ interface MealAttendanceProps {
   isAdmin: boolean
 }
 
+interface Member {
+  userId: string
+  name: string
+  email: string
+  isActive: boolean
+}
+
+interface MealCalendarData {
+  date: string
+  userId: string
+  userName: string
+  breakfast: { status: boolean; extra: number }
+  lunch: { status: boolean; extra: number }
+  dinner: { status: boolean; extra: number }
+  totalMeals: number
+}
+
 export default function MealAttendance({ messId, userId, mealFrequency, isAdmin }: MealAttendanceProps) {
   const [attendance, setAttendance] = useState<AttendanceData[]>([])
   const [mealSummary, setMealSummary] = useState<MealSummary[]>([])
@@ -121,12 +142,120 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
   const [pendingChanges, setPendingChanges] = useState<{ [key: string]: { isMealOn?: boolean, extraMealCount?: number } }>({})
   const [savingStates, setSavingStates] = useState<{ [key: string]: boolean }>({})
 
+  // Meal Calendar state variables
+  const [showMealCalendar, setShowMealCalendar] = useState(false)
+  const [members, setMembers] = useState<Member[]>([])
+  const [selectedMember, setSelectedMember] = useState<string>('all') // 'all' or specific userId
+  const [calendarDateRange, setCalendarDateRange] = useState<'week' | 'month' | 'custom'>('week')
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
+  const [mealCalendarData, setMealCalendarData] = useState<MealCalendarData[]>([])
+  const [isLoadingCalendar, setIsLoadingCalendar] = useState(false)
+
   // Always use current date in Bangladesh timezone
   const getCurrentDateStr = () => {
     // Get current date in Bangladesh timezone (GMT+6)
     const now = new Date()
     const bangladeshTime = new Date(now.getTime() + (6 * 60 * 60 * 1000)) // Add 6 hours for GMT+6
     return bangladeshTime.toISOString().split('T')[0]
+  }
+
+  // Helper functions for meal calendar
+  const getDateRange = () => {
+    const today = new Date()
+    let startDate: string
+    let endDate: string
+
+    switch (calendarDateRange) {
+      case 'week':
+        // Get last 7 days
+        const weekStart = new Date(today)
+        weekStart.setDate(today.getDate() - 6)
+        startDate = weekStart.toISOString().split('T')[0]
+        endDate = today.toISOString().split('T')[0]
+        break
+      case 'month':
+        // Get last 30 days
+        const monthStart = new Date(today)
+        monthStart.setDate(today.getDate() - 29)
+        startDate = monthStart.toISOString().split('T')[0]
+        endDate = today.toISOString().split('T')[0]
+        break
+      case 'custom':
+        startDate = customStartDate || today.toISOString().split('T')[0]
+        endDate = customEndDate || today.toISOString().split('T')[0]
+        break
+      default:
+        startDate = today.toISOString().split('T')[0]
+        endDate = today.toISOString().split('T')[0]
+    }
+
+    return { startDate, endDate }
+  }
+
+  // Fetch members list
+  const fetchMembers = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('token')
+      const response = await fetch('/api/members', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setMembers(data.members || [])
+      }
+    } catch (error) {
+      console.error('Error fetching members:', error)
+    }
+  }, [])
+
+  // Fetch meal calendar data
+  const fetchMealCalendarData = useCallback(async () => {
+    try {
+      setIsLoadingCalendar(true)
+      const { startDate, endDate } = getDateRange()
+      const token = localStorage.getItem('token')
+      
+      let apiUrl = `/api/meal-attendance/calendar?startDate=${startDate}&endDate=${endDate}`
+      if (selectedMember !== 'all') {
+        apiUrl += `&userId=${selectedMember}`
+      }
+      
+      const response = await fetch(apiUrl, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      })
+      
+      if (response.ok) {
+        const data = await response.json()
+        setMealCalendarData(data.calendarData || [])
+      } else {
+        showToast('Error fetching meal calendar data', 'error')
+      }
+    } catch (error) {
+      console.error('Error fetching meal calendar data:', error)
+      showToast('Error loading meal calendar', 'error')
+    } finally {
+      setIsLoadingCalendar(false)
+    }
+  }, [selectedMember, calendarDateRange, customStartDate, customEndDate])
+
+  // Generate date array for the selected range
+  const generateDateArray = () => {
+    const { startDate, endDate } = getDateRange()
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    const dates = []
+    
+    for (let date = new Date(start); date <= end; date.setDate(date.getDate() + 1)) {
+      dates.push(new Date(date).toISOString().split('T')[0])
+    }
+    
+    return dates.reverse() // Show most recent first
   }
 
   // Deadline calculation function
@@ -322,6 +451,25 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
 
     initializeData()
   }, [fetchMessSettings, fetchUserActiveStatus, fetchAttendanceData])
+
+  // Fetch members for meal calendar
+  useEffect(() => {
+    fetchMembers()
+  }, [fetchMembers])
+
+  // Initialize calendar date range
+  useEffect(() => {
+    const today = new Date()
+    const weekAgo = new Date(today)
+    weekAgo.setDate(today.getDate() - 6)
+    
+    if (!customStartDate) {
+      setCustomStartDate(weekAgo.toISOString().split('T')[0])
+    }
+    if (!customEndDate) {
+      setCustomEndDate(today.toISOString().split('T')[0])
+    }
+  }, [])
 
   // Toggle functions that only update local state (no API call)
   const toggleMealStatus = (mealSlot: string, currentValue: boolean) => {
@@ -1130,6 +1278,279 @@ export default function MealAttendance({ messId, userId, mealFrequency, isAdmin 
                 {mealSummary.reduce((total, summary) => total + summary.overallTotalMeals, 0)}</span> total meals today
             </p>
           </div>
+        </div>
+      </div>
+
+      {/* View Meal Calendar Section */}
+      <div className="border-t pt-6 mt-6">
+        <div className="bg-gradient-to-r from-blue-50 to-cyan-50 rounded-lg p-6 border-2 border-blue-200">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-xl font-semibold text-gray-900 flex items-center">
+              <CalendarMonth className="mr-2 text-blue-600" />
+              View Meal Calendar
+            </h4>
+            <button
+              onClick={() => {
+                if (!showMealCalendar) {
+                  fetchMealCalendarData()
+                }
+                setShowMealCalendar(!showMealCalendar)
+              }}
+              className={`px-4 py-2 rounded-lg font-medium transition-all duration-200 ${
+                showMealCalendar 
+                  ? 'bg-red-500 hover:bg-red-600 text-white' 
+                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+              }`}
+            >
+              {showMealCalendar ? 'Hide Calendar' : 'Show Calendar'}
+            </button>
+          </div>
+
+          {showMealCalendar && (
+            <div className="space-y-6">
+              {/* Filter Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 bg-white rounded-lg border border-blue-200">
+                {/* Member Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <Person className="mr-1" style={{ fontSize: '1rem' }} />
+                    Select Member
+                  </label>
+                  <select
+                    value={selectedMember}
+                    onChange={(e) => {
+                      setSelectedMember(e.target.value)
+                      // Auto-refresh data when member changes
+                      setTimeout(() => fetchMealCalendarData(), 100)
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                  >
+                    <option value="all">All Members</option>
+                    {members.map((member) => (
+                      <option key={member.userId} value={member.userId}>
+                        {member.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Date Range Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <DateRange className="mr-1" style={{ fontSize: '1rem' }} />
+                    Date Range
+                  </label>
+                  <select
+                    value={calendarDateRange}
+                    onChange={(e) => {
+                      setCalendarDateRange(e.target.value as 'week' | 'month' | 'custom')
+                      // Auto-refresh data when range changes
+                      setTimeout(() => fetchMealCalendarData(), 100)
+                    }}
+                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                  >
+                    <option value="week">Last Week</option>
+                    <option value="month">Last Month</option>
+                    <option value="custom">Custom Range</option>
+                  </select>
+                </div>
+
+                {/* View Button */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    <TableChart className="mr-1" style={{ fontSize: '1rem' }} />
+                    Action
+                  </label>
+                  <button
+                    onClick={fetchMealCalendarData}
+                    disabled={isLoadingCalendar}
+                    className="w-full bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {isLoadingCalendar ? 'Loading...' : 'Refresh Data'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Custom Date Range Inputs */}
+              {calendarDateRange === 'custom' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Start Date</label>
+                    <input
+                      type="date"
+                      value={customStartDate}
+                      onChange={(e) => setCustomStartDate(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">End Date</label>
+                    <input
+                      type="date"
+                      value={customEndDate}
+                      onChange={(e) => setCustomEndDate(e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-gray-900 bg-white"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Calendar Table */}
+              <div className="bg-white rounded-lg border border-blue-200 overflow-hidden">
+                {isLoadingCalendar ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p className="text-gray-600">Loading meal calendar...</p>
+                  </div>
+                ) : mealCalendarData.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <CalendarMonth className="mx-auto mb-2 text-gray-300" style={{ fontSize: '3rem' }} />
+                    <p>No meal data found for the selected period</p>
+                    <p className="text-sm">Try selecting a different date range or member</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-blue-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-blue-900 uppercase tracking-wider">Date</th>
+                          {selectedMember === 'all' && (
+                            <th className="px-4 py-3 text-left text-xs font-medium text-blue-900 uppercase tracking-wider">Member</th>
+                          )}
+                          {mealFrequency === 3 && (
+                            <th className="px-4 py-3 text-center text-xs font-medium text-blue-900 uppercase tracking-wider">Breakfast</th>
+                          )}
+                          <th className="px-4 py-3 text-center text-xs font-medium text-blue-900 uppercase tracking-wider">Lunch</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-blue-900 uppercase tracking-wider">Dinner</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-blue-900 uppercase tracking-wider">Total Meals</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {generateDateArray().map((date) => {
+                          const dayData = mealCalendarData.filter(item => item.date === date)
+                          
+                          if (selectedMember === 'all') {
+                            // Show all members for this date
+                            return dayData.map((memberData, index) => (
+                              <tr key={`${date}-${memberData.userId}`} className={index === 0 ? 'border-t-2 border-blue-200' : ''}>
+                                {index === 0 && (
+                                  <td rowSpan={dayData.length} className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900 bg-blue-50 border-r border-blue-200">
+                                    {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                                      month: 'short',
+                                      day: 'numeric',
+                                      weekday: 'short'
+                                    })}
+                                  </td>
+                                )}
+                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                  {memberData.userName}
+                                </td>
+                                {mealFrequency === 3 && (
+                                  <td className="px-4 py-4 whitespace-nowrap text-center">
+                                    <div className="flex items-center justify-center space-x-1">
+                                      <span className={`w-3 h-3 rounded-full ${memberData.breakfast.status ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                      {memberData.breakfast.extra > 0 && (
+                                        <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">+{memberData.breakfast.extra}</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                )}
+                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <span className={`w-3 h-3 rounded-full ${memberData.lunch.status ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                    {memberData.lunch.extra > 0 && (
+                                      <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">+{memberData.lunch.extra}</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <span className={`w-3 h-3 rounded-full ${memberData.dinner.status ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                    {memberData.dinner.extra > 0 && (
+                                      <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">+{memberData.dinner.extra}</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {memberData.totalMeals}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))
+                          } else {
+                            // Show single member for this date
+                            const memberData = dayData[0]
+                            return (
+                              <tr key={date}>
+                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                  {new Date(date + 'T00:00:00').toLocaleDateString('en-US', {
+                                    month: 'short',
+                                    day: 'numeric',
+                                    weekday: 'short'
+                                  })}
+                                </td>
+                                {mealFrequency === 3 && (
+                                  <td className="px-4 py-4 whitespace-nowrap text-center">
+                                    <div className="flex items-center justify-center space-x-1">
+                                      <span className={`w-3 h-3 rounded-full ${memberData?.breakfast.status ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                      {memberData?.breakfast.extra > 0 && (
+                                        <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">+{memberData.breakfast.extra}</span>
+                                      )}
+                                    </div>
+                                  </td>
+                                )}
+                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <span className={`w-3 h-3 rounded-full ${memberData?.lunch.status ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                    {memberData?.lunch.extra > 0 && (
+                                      <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">+{memberData.lunch.extra}</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                  <div className="flex items-center justify-center space-x-1">
+                                    <span className={`w-3 h-3 rounded-full ${memberData?.dinner.status ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                    {memberData?.dinner.extra > 0 && (
+                                      <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">+{memberData.dinner.extra}</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {memberData?.totalMeals || 0}
+                                  </span>
+                                </td>
+                              </tr>
+                            )
+                          }
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
+              {/* Legend */}
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <h5 className="text-sm font-medium text-gray-900 mb-2">Legend:</h5>
+                <div className="flex flex-wrap gap-4 text-xs">
+                  <div className="flex items-center space-x-1">
+                    <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                    <span className="text-gray-700">Meal On</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="w-3 h-3 rounded-full bg-gray-300"></span>
+                    <span className="text-gray-700">Meal Off</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs bg-orange-100 text-orange-800 px-1 rounded">+2</span>
+                    <span className="text-gray-700">Extra Meals</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
