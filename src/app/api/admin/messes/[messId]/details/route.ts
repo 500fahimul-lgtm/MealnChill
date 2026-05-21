@@ -118,11 +118,45 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ mess
         { $match: { messId: mess._id } },
         {
           $group: {
+            _id: {
+              date: { $dateToString: { format: "%Y-%m-%d", date: "$date" } }
+            },
+            totalBreakfastsDay: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$mealSlot', 'breakfast'] }, { $eq: ['$isMealOn', true] }] },
+                  { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                  { $cond: [{ $eq: ['$mealSlot', 'breakfast'] }, { $ifNull: ['$extraMealCount', 0] }, 0] }
+                ]
+              }
+            },
+            totalLunchesDay: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$mealSlot', 'lunch'] }, { $eq: ['$isMealOn', true] }] },
+                  { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                  { $cond: [{ $eq: ['$mealSlot', 'lunch'] }, { $ifNull: ['$extraMealCount', 0] }, 0] }
+                ]
+              }
+            },
+            totalDinnersDay: {
+              $sum: {
+                $cond: [
+                  { $and: [{ $eq: ['$mealSlot', 'dinner'] }, { $eq: ['$isMealOn', true] }] },
+                  { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                  { $cond: [{ $eq: ['$mealSlot', 'dinner'] }, { $ifNull: ['$extraMealCount', 0] }, 0] }
+                ]
+              }
+            }
+          }
+        },
+        {
+          $group: {
             _id: null,
             totalMealDays: { $sum: 1 },
-            totalBreakfasts: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.breakfast' } } } },
-            totalLunches: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.lunch' } } } },
-            totalDinners: { $sum: { $size: { $filter: { input: '$attendance', cond: '$$this.dinner' } } } }
+            totalBreakfasts: { $sum: '$totalBreakfastsDay' },
+            totalLunches: { $sum: '$totalLunchesDay' },
+            totalDinners: { $sum: '$totalDinnersDay' }
           }
         }
       ])
