@@ -182,7 +182,15 @@ export async function GET(request: NextRequest) {
             {
               $group: {
                 _id: null,
-                totalMeals: { $sum: { $add: ['$breakfast', '$lunch', '$dinner'] } }
+                totalMeals: {
+                  $sum: {
+                    $cond: [
+                      { $eq: ['$isMealOn', true] },
+                      { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                      { $ifNull: ['$extraMealCount', 0] }
+                    ]
+                  }
+                }
               }
             }
           ])

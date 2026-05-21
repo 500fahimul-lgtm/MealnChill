@@ -57,16 +57,55 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
       { $match: { userId: user._id } },
       {
         $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$date" } }
+          },
+          totalMealsDay: {
+            $sum: {
+              $cond: [
+                { $eq: ['$isMealOn', true] },
+                { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                { $ifNull: ['$extraMealCount', 0] }
+              ]
+            }
+          },
+          breakfastCountDay: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$mealSlot', 'breakfast'] }, { $eq: ['$isMealOn', true] }] },
+                { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                { $cond: [{ $eq: ['$mealSlot', 'breakfast'] }, { $ifNull: ['$extraMealCount', 0] }, 0] }
+              ]
+            }
+          },
+          lunchCountDay: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$mealSlot', 'lunch'] }, { $eq: ['$isMealOn', true] }] },
+                { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                { $cond: [{ $eq: ['$mealSlot', 'lunch'] }, { $ifNull: ['$extraMealCount', 0] }, 0] }
+              ]
+            }
+          },
+          dinnerCountDay: {
+            $sum: {
+              $cond: [
+                { $and: [{ $eq: ['$mealSlot', 'dinner'] }, { $eq: ['$isMealOn', true] }] },
+                { $add: [1, { $ifNull: ['$extraMealCount', 0] }] },
+                { $cond: [{ $eq: ['$mealSlot', 'dinner'] }, { $ifNull: ['$extraMealCount', 0] }, 0] }
+              ]
+            }
+          }
+        }
+      },
+      {
+        $group: {
           _id: null,
-          totalMeals: { $sum: { $add: [
-            { $cond: ['$breakfast', 1, 0] },
-            { $cond: ['$lunch', 1, 0] },
-            { $cond: ['$dinner', 1, 0] }
-          ]}},
+          totalMeals: { $sum: '$totalMealsDay' },
           totalDays: { $sum: 1 },
-          breakfastCount: { $sum: { $cond: ['$breakfast', 1, 0] } },
-          lunchCount: { $sum: { $cond: ['$lunch', 1, 0] } },
-          dinnerCount: { $sum: { $cond: ['$dinner', 1, 0] } }
+          breakfastCount: { $sum: '$breakfastCountDay' },
+          lunchCount: { $sum: '$lunchCountDay' },
+          dinnerCount: { $sum: '$dinnerCountDay' }
         }
       }
     ])
@@ -98,10 +137,25 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
     ])
 
     // Get recent activities
-    const recentMeals = await MealAttendance.find({ userId: user._id })
-      .sort({ date: -1 })
-      .limit(10)
-      .lean()
+    const recentMeals = await MealAttendance.aggregate([
+      { $match: { userId: user._id } },
+      { $sort: { date: -1 } },
+      {
+        $group: {
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+          date: { $first: "$date" },
+          slots: {
+            $push: {
+              slot: "$mealSlot",
+              isMealOn: "$isMealOn",
+              extra: "$extraMealCount"
+            }
+          }
+        }
+      },
+      { $sort: { date: -1 } },
+      { $limit: 10 }
+    ])
 
     const recentDeposits = await Deposit.find({ userId: user._id })
       .sort({ createdAt: -1 })
@@ -155,13 +209,24 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ user
 
       // Recent Activities
       recentActivities: {
-        meals: recentMeals.map(meal => ({
-          date: meal.date,
-          breakfast: meal.breakfast,
-          lunch: meal.lunch,
-          dinner: meal.dinner,
-          mealsCount: (meal.breakfast ? 1 : 0) + (meal.lunch ? 1 : 0) + (meal.dinner ? 1 : 0)
-        })),
+        meals: recentMeals.map(meal => {
+          const breakfastSlot = meal.slots.find((s: any) => s.slot === 'breakfast');
+          const lunchSlot = meal.slots.find((s: any) => s.slot === 'lunch');
+          const dinnerSlot = meal.slots.find((s: any) => s.slot === 'dinner');
+
+          let mealsCount = 0;
+          if (breakfastSlot?.isMealOn) mealsCount += 1 + (breakfastSlot.extra || 0);
+          if (lunchSlot?.isMealOn) mealsCount += 1 + (lunchSlot.extra || 0);
+          if (dinnerSlot?.isMealOn) mealsCount += 1 + (dinnerSlot.extra || 0);
+
+          return {
+            date: meal.date,
+            breakfast: !!breakfastSlot?.isMealOn,
+            lunch: !!lunchSlot?.isMealOn,
+            dinner: !!dinnerSlot?.isMealOn,
+            mealsCount
+          };
+        }),
         deposits: recentDeposits.map(deposit => ({
           id: deposit._id,
           amount: deposit.amount,
