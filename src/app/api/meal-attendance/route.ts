@@ -166,20 +166,21 @@ export async function GET(req: NextRequest) {
     const messInfo2 = user.messId
     const activeMembers = messInfo2.members.filter((member: any) => member.isActive)
 
+    // Build a map of user attendance for O(1) lookups
+    const attendanceMap = new Map()
+    allAttendance.forEach(a => {
+      const key = `${a.mealSlot}-${a.userId.toString()}`
+      attendanceMap.set(key, a)
+    })
+
     const mealSummary = mealSlots.map(slot => {
-      const slotAttendance = allAttendance.filter(a => a.mealSlot === slot)
-      
       // For each member, determine their attendance status
       let totalStandardMeals = 0
       let totalExtraMeals = 0
       
       activeMembers.forEach((member: any) => {
-        const memberAttendance = slotAttendance.find(a => {
-          // Ensure proper ObjectId comparison
-          const attendanceUserId = a.userId.toString()
-          const memberUserId = member.userId.toString()
-          return attendanceUserId === memberUserId
-        })
+        const key = `${slot}-${member.userId.toString()}`
+        const memberAttendance = attendanceMap.get(key)
         
         if (memberAttendance) {
           // User has explicit attendance record
