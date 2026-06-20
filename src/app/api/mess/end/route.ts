@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
     // Get deposit data
     const depositData = await Deposit.find({
       messId,
+      status: 'approved',
       date: { $gte: startDate, $lte: endDate }
     }).populate('userId', 'name email')
 
@@ -198,15 +199,14 @@ export async function POST(req: NextRequest) {
       },
       expenseBreakdown: expenseData.map((expense: any) => ({
         date: expense.date,
-        description: expense.description,
-        amount: expense.amount,
-        category: expense.category
+        itemName: expense.itemName,
+        amount: expense.amount
       })),
       depositBreakdown: depositData.map((deposit: any) => ({
         date: deposit.date,
         amount: deposit.amount,
         memberName: deposit.userId.name,
-        description: deposit.description
+        note: deposit.note
       }))
     }
 

@@ -32,8 +32,9 @@ const notificationSchema = new mongoose.Schema({
       'leave_request_approved',
       'leave_request_rejected',
       'member_left',
-      'member_left',
-      'join_request'
+      'member_removed',
+      'join_request',
+      'mess_management'
     ],
   },
   title: {
