@@ -28,6 +28,7 @@ const notificationSchema = new mongoose.Schema({
       'admin_demotion',
       'admin_transfer',
       'admin_self_demotion',
+      'admin_change',
       'leave_request',
       'leave_request_approved',
       'leave_request_rejected',
